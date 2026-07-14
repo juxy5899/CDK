@@ -126,6 +126,9 @@ export interface EnvConfig {
   /** CloudFront の ALB オリジンドメイン名（未確定時はプレースホルダー） */
   albOriginDomainName: string;
 
+  /** CloudFront Origin-Facing のマネージドプレフィックスリスト ID */
+  cloudFrontOriginPrefixListId: string;
+
   /** 管理画面静的サイトのデフォルトルートオブジェクト */
   adminSiteDefaultRootObject: string;
 }

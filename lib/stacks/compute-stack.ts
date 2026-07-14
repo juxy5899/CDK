@@ -3,11 +3,12 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
-import { EnvConfig, buildResourceName } from '../config/env-config';
+import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-config';
 
 export interface ComputeStackProps extends cdk.StackProps {
   envName: string;
@@ -34,13 +35,21 @@ export class ComputeStack extends cdk.Stack {
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
-    // インターネットからの HTTP (80) アクセスを許可
+    // CloudFront Origin-Facing プレフィックスリストからのアクセスのみ許可
     // ────────────────────────────────────────────────
+    const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
+
     const albSg = new ec2.SecurityGroup(this, 'AlbSg', {
       vpc,
       description: 'ALB 用セキュリティグループ',
     });
-    albSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'HTTP アクセスを全許可');
+    albSg.addIngressRule(
+      ec2.Peer.prefixList(envConfig.cloudFrontOriginPrefixListId),
+      ec2.Port.tcp(hasAlbCertificate ? 443 : 80),
+      hasAlbCertificate
+        ? 'CloudFront からの HTTPS アクセスのみ許可'
+        : 'CloudFront からの HTTP アクセスのみ許可',
+    );
 
     // ────────────────────────────────────────────────
     // Application Load Balancer（インターネット向け）
@@ -53,12 +62,21 @@ export class ComputeStack extends cdk.Stack {
       securityGroup: albSg,
     });
 
-    // HTTP リスナー（ポート 80）
-    // TODO: Phase 3 で HTTPS (443) リスナーと ACM 証明書を追加予定
-    const listener = this.alb.addListener('HttpListener', {
-      port: 80,
-      open: false, // SG で制御するため open は false
-    });
+    // ALB リスナー
+    // ACM 証明書が設定済みの場合は HTTPS (443)、未設定の場合は HTTP (80) で待ち受ける
+    const listener = hasAlbCertificate
+      ? this.alb.addListener('HttpsListener', {
+          port: 443,
+          open: false,
+          certificates: [
+            acm.Certificate.fromCertificateArn(this, 'AlbCertificate', envConfig.certificateArn),
+          ],
+        })
+      : this.alb.addListener('HttpListener', {
+          port: 80,
+          open: false,
+        });
+    // TODO: ALB Listener に CloudFront カスタムヘッダー検証ルールを追加する
 
     // ────────────────────────────────────────────────
     // ECS クラスター
@@ -201,6 +219,17 @@ export class ComputeStack extends cdk.Stack {
       scaleOutCooldown: cdk.Duration.seconds(300),
       scaleInCooldown: cdk.Duration.seconds(300),
     });
+
+    new cdk.CfnOutput(this, 'AlbDnsName', {
+      value: this.alb.loadBalancerDnsName,
+      description: 'ALB の DNS 名。この値を environments.ts の albOriginDomainName に設定してください',
+    });
+
+    if (!hasAlbCertificate) {
+      new cdk.CfnOutput(this, 'AlbTlsDisabledNotice', {
+        value: 'Set certificateArn in environments.ts to enable HTTPS (443) on ALB origin',
+      });
+    }
 
   }
 }

@@ -30,6 +30,7 @@ export const environments: Record<string, EnvConfig> = {
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
     albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）
@@ -84,6 +85,7 @@ export const environments: Record<string, EnvConfig> = {
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
     albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）
@@ -138,6 +140,7 @@ export const environments: Record<string, EnvConfig> = {
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
     albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）

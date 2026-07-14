@@ -109,12 +109,12 @@ export class DataStack extends cdk.Stack {
 
     // ────────────────────────────────────────────────
     // アプリコンテナイメージ用 ECR リポジトリ
-    // イメージの改ざん防止のためタグを immutable に設定
+    // 外部パイプラインで latest を上書き運用できるようタグを mutable に設定
     // ────────────────────────────────────────────────
     this.appRepository = new ecr.Repository(this, 'AppRepository', {
       repositoryName: buildResourceName(envName, 'app').toLowerCase(),
       imageScanOnPush: true,
-      imageTagMutability: ecr.TagMutability.IMMUTABLE,
+      imageTagMutability: ecr.TagMutability.MUTABLE,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
     // 最新 10 イメージのみ保持するライフサイクルルール

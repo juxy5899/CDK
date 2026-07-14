@@ -128,12 +128,45 @@ export class EventProcessingStack extends cdk.Stack {
       }),
     );
 
+    const mediaConvertRoleIsPlaceholder = isPlaceholder(envConfig.mediaConvertRoleArn);
+
     this.eventProcessor.addToRolePolicy(
       new iam.PolicyStatement({
-        sid: 'MediaConvertPlaceholderActions',
+        sid: 'MediaConvertCreateJob',
         effect: iam.Effect.ALLOW,
-        actions: ['mediaconvert:CreateJob', 'mediaconvert:GetJob'],
+        actions: ['mediaconvert:CreateJob'],
         resources: ['*'],
+        conditions: mediaConvertRoleIsPlaceholder
+          ? undefined
+          : {
+              StringEquals: {
+                'mediaconvert:Role': envConfig.mediaConvertRoleArn,
+              },
+            },
+      }),
+    );
+
+    this.eventProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: 'MediaConvertGetJob',
+        effect: iam.Effect.ALLOW,
+        actions: ['mediaconvert:GetJob'],
+        resources: ['*'],
+      }),
+    );
+
+    // MediaConvert ジョブ実行時に指定する IAM ロールの PassRole 権限を最小化する
+    this.eventProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
+        sid: 'MediaConvertPassRole',
+        effect: iam.Effect.ALLOW,
+        actions: ['iam:PassRole'],
+        resources: [mediaConvertRoleIsPlaceholder ? '*' : envConfig.mediaConvertRoleArn],
+        conditions: {
+          StringEquals: {
+            'iam:PassedToService': 'mediaconvert.amazonaws.com',
+          },
+        },
       }),
     );
 

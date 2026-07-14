@@ -106,13 +106,17 @@ export class EdgeStack extends cdk.Stack {
     const hasCustomDomain = !isPlaceholder(envConfig.edgeDomainName);
     const hasEdgeCertificate = !isPlaceholder(envConfig.edgeCertificateArn);
     const hasAlbOriginDomain = !isPlaceholder(envConfig.albOriginDomainName);
+    const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
 
     const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {};
     if (hasAlbOriginDomain) {
       // API リクエストのみ ALB オリジンへ転送する
+      // TODO: CloudFront オリジンリクエストにカスタムヘッダー（例: X-Origin-Verify）を付与する
       additionalBehaviors['api/*'] = {
         origin: new origins.HttpOrigin(envConfig.albOriginDomainName, {
-          protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+          protocolPolicy: hasAlbCertificate
+            ? cloudfront.OriginProtocolPolicy.HTTPS_ONLY
+            : cloudfront.OriginProtocolPolicy.HTTP_ONLY,
         }),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
@@ -129,6 +133,7 @@ export class EdgeStack extends cdk.Stack {
       },
       additionalBehaviors,
       comment: buildResourceName(envName, 'edge-distribution'),
+      webAclId: this.webAclArn,
     };
 
     const distributionProps: cloudfront.DistributionProps =
@@ -149,14 +154,6 @@ export class EdgeStack extends cdk.Stack {
     // 管理画面静的配信をデフォルトにし、/api/* のみ ALB へルーティングする
     // ────────────────────────────────────────────────
     this.distribution = new cloudfront.Distribution(this, 'Distribution', distributionProps);
-
-    // WAF を CloudFront に関連付ける（WAF 有効時のみ）
-    if (this.webAclArn) {
-      new wafv2.CfnWebACLAssociation(this, 'CloudFrontWebAclAssociation', {
-        resourceArn: `arn:aws:cloudfront::${cdk.Aws.ACCOUNT_ID}:distribution/${this.distribution.distributionId}`,
-        webAclArn: this.webAclArn,
-      });
-    }
 
     if (!envConfig.enableWaf) {
       new cdk.CfnOutput(this, 'WafDisabledNotice', {
@@ -183,6 +180,12 @@ export class EdgeStack extends cdk.Stack {
     if (!hasAlbOriginDomain) {
       new cdk.CfnOutput(this, 'AlbOriginDomainPlaceholderNotice', {
         value: 'Set albOriginDomainName in environments.ts to enable /api/* forwarding to ALB',
+      });
+    }
+
+    if (hasAlbOriginDomain && !hasAlbCertificate) {
+      new cdk.CfnOutput(this, 'AlbOriginHttpFallbackNotice', {
+        value: 'Set certificateArn in environments.ts to enforce HTTPS_ONLY from CloudFront to ALB',
       });
     }
 
