@@ -1,0 +1,257 @@
+{
+  "/MTI-stg-SecurityStack": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    },
+    {
+      "type": "aws:cdk:stack-tags",
+      "data": [
+        {
+          "key": "Environment",
+          "value": "stg"
+        },
+        {
+          "key": "ManagedBy",
+          "value": "CDK"
+        },
+        {
+          "key": "Project",
+          "value": "MTI-VideoSystem"
+        }
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/JpkiIpSet": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JpkiIpSet"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:83:25)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/WebAcl": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "WebAcl"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:92:22)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/GuardDutyDetector": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "GuardDutyDetector"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:206:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Cmk/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Cmk0E70AD9C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Key2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:38:16)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/CognitoCrossAccountRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CognitoCrossAccountRoleE52D0A54"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Role2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:53:36)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/TrailBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TrailBucketA831CE63"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Bucket2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:170:27)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Trail/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Trail022F0CF2"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Trail2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:190:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Exports/Output{\"Fn::GetAtt\":[\"WebAcl\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttWebAclArnEF1FFB35"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/CognitoCrossAccountRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CognitoCrossAccountRoleDefaultPolicyDB217F67"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:62:34)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/TrailBucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TrailBucketPolicyFEBC3C5C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Trail2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:190:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Trail/LogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TrailLogGroup4CBE3AF5"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Trail2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:190:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Trail/LogsRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TrailLogsRole83B70503"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Trail2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:190:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-SecurityStack/Trail/LogsRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TrailLogsRoleDefaultPolicy563657A5"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Trail2 in aws-cdk-lib...",
+        "new SecurityStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\security-stack.ts:190:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:54:23)",
+        "...node internals..."
+      ]
+    }
+  ]
+}

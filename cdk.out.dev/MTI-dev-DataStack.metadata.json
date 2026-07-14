@@ -1,0 +1,310 @@
+{
+  "/MTI-dev-DataStack": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    },
+    {
+      "type": "aws:cdk:warning",
+      "data": "No cross-stack-reference strength configured, defaulting to \"strong\". We recommend you set feature flag \"@aws-cdk/core:defaultCrossStackReferences\" to \"both\", then deploy everywhere, then set it to \"weak\". Alternatively, set it to \"strong\" explicitly to lock in the current producer-protecting behavior. (See: https://github.com/aws/aws-cdk/blob/main/packages/aws-cdk-lib/README.md#reference-strength) [ack: @aws-cdk/core:crossStackReferencesDefaultStrong]",
+      "trace": [
+        "Annotations.addMessage (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\annotations.js:1:3441)",
+        "Annotations.addWarningV2 (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\annotations.js:1:2129)",
+        "resolveValue (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\private\\refs.js:1:6065)",
+        "resolveReferences (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\private\\refs.js:1:4778)",
+        "prepareApp (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\private\\prepare-app.js:1:1514)",
+        "synthesize (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\private\\synthesis.js:1:3701)",
+        "App.synth (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\stage.js:1:4636)",
+        "App.synth (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\app.js:1:4814)",
+        "process.<anonymous> (D:\\MTI\\CloudFormation\\CDK\\node_modules\\aws-cdk-lib\\core\\lib\\app.js:1:3773)",
+        "Object.onceWrapper (node:events:631:26)",
+        "process.emit (node:events:509:28)",
+        "process.emit (node:domain:489:12)",
+        "process.emit.sharedData.processEmitHook.installedValue [as emit] (D:\\MTI\\CloudFormation\\CDK\\node_modules\\@cspotcode\\source-map-support\\source-map-support.js:745:40)"
+      ]
+    },
+    {
+      "type": "aws:cdk:stack-tags",
+      "data": [
+        {
+          "key": "Environment",
+          "value": "dev"
+        },
+        {
+          "key": "ManagedBy",
+          "value": "CDK"
+        },
+        {
+          "key": "Project",
+          "value": "MTI-VideoSystem"
+        }
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraSg/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraSgFE0A4948"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new SecurityGroup2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:35:22)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraCluster/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraCluster23D869C0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:58:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/VideoBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "VideoBucket6ED8E1AF"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Bucket2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:87:24)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketNotificationsHandler050a0587b7544547bf325f094a3db8347ECC3691"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AppRepository/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AppRepositoryB584A693"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Repository2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:112:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/Exports/Output{\"Fn::GetAtt\":[\"AppRepositoryB584A693\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttAppRepositoryB584A693Arn06BB1DCB"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/Exports/Output{\"Ref\":\"AppRepositoryB584A693\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefAppRepositoryB584A693635A9E88"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/Exports/Output{\"Ref\":\"AuroraClusterSecretAttachmentDB8032DA\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/Exports/Output{\"Ref\":\"VideoBucket6ED8E1AF\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefVideoBucket6ED8E1AF864760DE"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraCluster/Subnets/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterSubnetsF3E9E6AD"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:58:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraCluster/Secret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "MTIdevDataStackAuroraClusterSecretC0FED5023fdaad7efa858a3daf9490cf0a702aeb"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:58:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraCluster/Writer/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterWriterAA1AB06C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:58:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/VideoBucket/Notifications/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "VideoBucketNotificationsE73D63C7"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Bucket2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:87:24)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/BucketNotificationsHandler050a0587b7544547bf325f094a3db834/Role/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketNotificationsHandler050a0587b7544547bf325f094a3db834RoleB6FB88EC"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/AuroraCluster/Secret/Attachment/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterSecretAttachmentDB8032DA"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\data-stack.ts:58:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:43:19)",
+        "...node internals, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-dev-DataStack/VideoBucket/Notifications/HandlerPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "VideoBucketNotificationsHandlerPolicy17EB1726"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ]
+}

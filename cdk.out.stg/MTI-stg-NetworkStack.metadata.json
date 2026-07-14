@@ -1,0 +1,541 @@
+{
+  "/MTI-stg-NetworkStack": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    },
+    {
+      "type": "aws:cdk:stack-tags",
+      "data": [
+        {
+          "key": "Environment",
+          "value": "stg"
+        },
+        {
+          "key": "ManagedBy",
+          "value": "CDK"
+        },
+        {
+          "key": "Project",
+          "value": "MTI-VideoSystem"
+        }
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Vpc": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Vpc"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:44:20)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicSubnet1a": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicSubnet1a"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:56:28)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicSubnet1c": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicSubnet1c"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:65:28)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateSubnet1a": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateSubnet1a"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:78:29)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateSubnet1c": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateSubnet1c"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:86:29)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/DbSubnet1a": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbSubnet1a"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:98:24)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/DbSubnet1c": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbSubnet1c"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:106:24)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Igw": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "Igw"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:118:17)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/IgwAttachment": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "IgwAttachment"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:123:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/RegionalNatGateway": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "RegionalNatGateway"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:133:32)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicRouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicRouteTable"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:146:30)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicDefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicDefaultRoute"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:152:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicSubnet1aRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicSubnet1aRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:159:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PublicSubnet1cRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PublicSubnet1cRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:165:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateRouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateRouteTable"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:177:31)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateDefaultRoute": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateDefaultRoute"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:183:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateSubnet1aRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateSubnet1aRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:190:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/PrivateSubnet1cRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "PrivateSubnet1cRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:196:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/DbRouteTable": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbRouteTable"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:206:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/DbSubnet1aRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbSubnet1aRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:212:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/DbSubnet1cRta": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbSubnet1cRta"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:218:5)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/S3GatewayEndpoint": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "S3GatewayEndpoint"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:261:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/EndpointSg/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EndpointSg9223A863"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new SecurityGroup2 in aws-cdk-lib...",
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:272:26)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/EcrApiEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EcrApiEndpointB01DFFD7"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new InterfaceVpcEndpoint2 in aws-cdk-lib...",
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:295:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/EcrDkrEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "EcrDkrEndpoint2A32680E"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new InterfaceVpcEndpoint2 in aws-cdk-lib...",
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:307:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/CloudWatchLogsEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CloudWatchLogsEndpointF23EDC4F"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new InterfaceVpcEndpoint2 in aws-cdk-lib...",
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:319:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/SecretsManagerEndpoint/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SecretsManagerEndpoint5E83C66B"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new InterfaceVpcEndpoint2 in aws-cdk-lib...",
+        "new NetworkStack (D:\\MTI\\CloudFormation\\CDK\\lib\\stacks\\network-stack.ts:331:7)",
+        "<anonymous> (D:\\MTI\\CloudFormation\\CDK\\bin\\app.ts:34:22)",
+        "...node internals, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"Vpc\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefVpc0040386A"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"DbSubnet1a\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefDbSubnet1a4E62FE79"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"DbSubnet1c\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefDbSubnet1cEEE0C4A4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"PublicSubnet1a\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefPublicSubnet1a1DA531A5"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"PublicSubnet1c\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefPublicSubnet1c732EA97F"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"PrivateSubnet1a\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefPrivateSubnet1a21647B63"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/MTI-stg-NetworkStack/Exports/Output{\"Ref\":\"PrivateSubnet1c\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefPrivateSubnet1c0B9AC203"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals...",
+        "(no user code in 10 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ]
+}

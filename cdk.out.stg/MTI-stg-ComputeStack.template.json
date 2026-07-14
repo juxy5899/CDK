@@ -1,0 +1,737 @@
+{
+ "Description": "[stg] MTI ビデオシステム - 計算基盤スタック",
+ "Resources": {
+  "AlbSg1155C1BE": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "ALB 用セキュリティグループ",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "HTTP アクセスを全許可",
+      "FromPort": 80,
+      "IpProtocol": "tcp",
+      "ToPort": 80
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "VpcId": {
+     "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefVpc0040386A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/AlbSg/Resource"
+   }
+  },
+  "Alb16C2F182": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::GetAtt": [
+       "AlbSg1155C1BE",
+       "GroupId"
+      ]
+     }
+    ],
+    "Subnets": [
+     {
+      "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefPublicSubnet1a1DA531A5"
+     },
+     {
+      "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefPublicSubnet1c732EA97F"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "Type": "application"
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Alb/Resource"
+   }
+  },
+  "AlbHttpListener00C8B33E": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "AlbHttpListenerServiceTargetGroupF0D25EE9"
+      },
+      "Type": "forward"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb16C2F182"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Alb/HttpListener/Resource"
+   }
+  },
+  "AlbHttpListenerServiceTargetGroupF0D25EE9": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckPath": "/health",
+    "HealthCheckPort": "8080",
+    "HealthCheckProtocol": "HTTP",
+    "Port": 8080,
+    "Protocol": "HTTP",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "VpcId": {
+     "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefVpc0040386A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Alb/HttpListener/ServiceTargetGroup/Resource"
+   }
+  },
+  "ClusterEB0386A7": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "MTI-VideoSystem-stg-cluster",
+    "ClusterSettings": [
+     {
+      "Name": "containerInsights",
+      "Value": "enabled"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Cluster/Resource"
+   }
+  },
+  "TaskDefTaskRole1EDB4A67": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/TaskDef/TaskRole/Resource"
+   }
+  },
+  "TaskDef54694570": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Environment": [
+       {
+        "Name": "APP_ENV",
+        "Value": "stg"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Join": [
+        "",
+        [
+         {
+          "Fn::Select": [
+           4,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputFnGetAttAppRepositoryB584A693Arn06BB1DCB"
+             }
+            ]
+           }
+          ]
+         },
+         ".dkr.ecr.",
+         {
+          "Fn::Select": [
+           3,
+           {
+            "Fn::Split": [
+             ":",
+             {
+              "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputFnGetAttAppRepositoryB584A693Arn06BB1DCB"
+             }
+            ]
+           }
+          ]
+         },
+         ".",
+         {
+          "Ref": "AWS::URLSuffix"
+         },
+         "/",
+         {
+          "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputRefAppRepositoryB584A693635A9E88"
+         },
+         ":latest"
+        ]
+       ]
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "TaskDefappLogGroupA2E94E99"
+        },
+        "awslogs-stream-prefix": "MTI-VideoSystem-stg-app",
+        "awslogs-region": "ap-northeast-1"
+       }
+      },
+      "Name": "app",
+      "PortMappings": [
+       {
+        "ContainerPort": 8080,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "DB_SECRET_ARN",
+        "ValueFrom": {
+         "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "TaskDefExecutionRoleB4775C97",
+      "Arn"
+     ]
+    },
+    "Family": "MTIstgComputeStackTaskDefF55C1529",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "TaskDefTaskRole1EDB4A67",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/TaskDef/Resource"
+   }
+  },
+  "TaskDefappLogGroupA2E94E99": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "RetentionInDays": 30,
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Retain",
+   "DeletionPolicy": "Retain",
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/TaskDef/app/LogGroup/Resource"
+   }
+  },
+  "TaskDefExecutionRoleB4775C97": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/TaskDef/ExecutionRole/Resource"
+   }
+  },
+  "TaskDefExecutionRoleDefaultPolicy0DBB737A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputFnGetAttAppRepositoryB584A693Arn06BB1DCB"
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "TaskDefappLogGroupA2E94E99",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:GetSecretValue"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "MTI-stg-DataStack:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "TaskDefExecutionRoleDefaultPolicy0DBB737A",
+    "Roles": [
+     {
+      "Ref": "TaskDefExecutionRoleB4775C97"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/TaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "ServiceSg2632F788": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "ECS Fargate サービス用セキュリティグループ",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "SecurityGroupIngress": [
+     {
+      "Description": "ALB からのアクセスのみ許可",
+      "FromPort": 8080,
+      "IpProtocol": "tcp",
+      "SourceSecurityGroupId": {
+       "Fn::GetAtt": [
+        "AlbSg1155C1BE",
+        "GroupId"
+       ]
+      },
+      "ToPort": 8080
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "VpcId": {
+     "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefVpc0040386A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/ServiceSg/Resource"
+   }
+  },
+  "ServiceSgfromMTIstgComputeStackAlbSg75993A508080A311D111": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Load balancer to target",
+    "FromPort": 8080,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "ServiceSg2632F788",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AlbSg1155C1BE",
+      "GroupId"
+     ]
+    },
+    "ToPort": 8080
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/ServiceSg/from MTIstgComputeStackAlbSg75993A50:8080"
+   }
+  },
+  "ServiceD69D759B": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "ClusterEB0386A7"
+    },
+    "DeploymentConfiguration": {
+     "DeploymentCircuitBreaker": {
+      "Enable": true,
+      "Rollback": true
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 2,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "app",
+      "ContainerPort": 8080,
+      "TargetGroupArn": {
+       "Ref": "AlbHttpListenerServiceTargetGroupF0D25EE9"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::GetAtt": [
+         "ServiceSg2632F788",
+         "GroupId"
+        ]
+       }
+      ],
+      "Subnets": [
+       {
+        "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefPrivateSubnet1a21647B63"
+       },
+       {
+        "Fn::ImportValue": "MTI-stg-NetworkStack:ExportsOutputRefPrivateSubnet1c0B9AC203"
+       }
+      ]
+     }
+    },
+    "ServiceName": "MTI-VideoSystem-stg-service",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "stg"
+     },
+     {
+      "Key": "ManagedBy",
+      "Value": "CDK"
+     },
+     {
+      "Key": "Project",
+      "Value": "MTI-VideoSystem"
+     }
+    ],
+    "TaskDefinition": {
+     "Ref": "TaskDef54694570"
+    }
+   },
+   "DependsOn": [
+    "AlbHttpListener00C8B33E",
+    "AlbHttpListenerServiceTargetGroupF0D25EE9",
+    "TaskDefTaskRole1EDB4A67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Service/Service"
+   }
+  },
+  "ServiceTaskCountTarget23E25614": {
+   "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+   "Properties": {
+    "MaxCapacity": 3,
+    "MinCapacity": 2,
+    "ResourceId": {
+     "Fn::Join": [
+      "",
+      [
+       "service/",
+       {
+        "Ref": "ClusterEB0386A7"
+       },
+       "/",
+       {
+        "Fn::GetAtt": [
+         "ServiceD69D759B",
+         "Name"
+        ]
+       }
+      ]
+     ]
+    },
+    "RoleARN": "arn:aws:iam::123456789012:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService",
+    "ScalableDimension": "ecs:service:DesiredCount",
+    "ServiceNamespace": "ecs"
+   },
+   "DependsOn": [
+    "TaskDefTaskRole1EDB4A67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Service/TaskCount/Target/Resource"
+   }
+  },
+  "ServiceTaskCountTargetCpuScaleOutA4DBDF22": {
+   "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+   "Properties": {
+    "PolicyName": "MTIstgComputeStackServiceTaskCountTargetCpuScaleOut7952618D",
+    "PolicyType": "TargetTrackingScaling",
+    "ScalingTargetId": {
+     "Ref": "ServiceTaskCountTarget23E25614"
+    },
+    "TargetTrackingScalingPolicyConfiguration": {
+     "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+     },
+     "ScaleInCooldown": 300,
+     "ScaleOutCooldown": 300,
+     "TargetValue": 70
+    }
+   },
+   "DependsOn": [
+    "TaskDefTaskRole1EDB4A67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Service/TaskCount/Target/CpuScaleOut/Resource"
+   }
+  },
+  "ServiceTaskCountTargetMemScaleOut58A15302": {
+   "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+   "Properties": {
+    "PolicyName": "MTIstgComputeStackServiceTaskCountTargetMemScaleOut0EE055A6",
+    "PolicyType": "TargetTrackingScaling",
+    "ScalingTargetId": {
+     "Ref": "ServiceTaskCountTarget23E25614"
+    },
+    "TargetTrackingScalingPolicyConfiguration": {
+     "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageMemoryUtilization"
+     },
+     "ScaleInCooldown": 300,
+     "ScaleOutCooldown": 300,
+     "TargetValue": 80
+    }
+   },
+   "DependsOn": [
+    "TaskDefTaskRole1EDB4A67"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/Service/TaskCount/Target/MemScaleOut/Resource"
+   }
+  },
+  "WafAlbAssociation": {
+   "Type": "AWS::WAFv2::WebACLAssociation",
+   "Properties": {
+    "ResourceArn": {
+     "Ref": "Alb16C2F182"
+    },
+    "WebACLArn": {
+     "Fn::ImportValue": "MTI-stg-SecurityStack:ExportsOutputFnGetAttWebAclArnEF1FFB35"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/WafAlbAssociation"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/31QTWvDMAz9Lb27XhtG713GxqCH0RR2HIqjBDWuXSwnpRj/95G4H8llJz096T19ZDLbrOVqARdeqqpdaiplKDyoVsCFfwOqTIYCVefIXz+d7c4ir83/xJdpHDJHgRrYk9IWqhI0GEWm6TMZtuezJgWerNlZqN7GGrrBaJZP+4g9mlvPHU/qB3AN+sc+kzQKVCxDrjv2SX+HH+Aa8HgAbt+xJkODUVLPGWs8kEE34W7aAl1PCtMLEiwUaCj1aJvbzvgoCE4y7K0e+8b4bTWp65AmFIW2Dcuws83jhjuOAp53QuctK9BkGhmeo4ZrxyXmTAoHB6ol0xRJ95w9I6K4QN1nMq/ND5bbfLdltorGqVHskW3nFEZhbIXyyC999irXG7laHJlo6Trj6YRyn+IfQwifQFcCAAA="
+   },
+   "Metadata": {
+    "aws:cdk:path": "MTI-stg-ComputeStack/CDKMetadata/Default"
+   }
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}
