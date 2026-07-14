@@ -36,7 +36,6 @@ export const environments: Record<string, EnvConfig> = {
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
     vpcEndpointsEnabled: false, // VPC エンドポイント有効化フラグ（NAT コスト最適化と通信閉域化）
-    enableFixedNatEip: false, // 固定 NAT EIP 有効化フラグ（dev は必要時のみ true）
     dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
     auroraMultiAz: false, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
@@ -91,7 +90,6 @@ export const environments: Record<string, EnvConfig> = {
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
     vpcEndpointsEnabled: true, // VPC エンドポイント有効化フラグ（stg は有効）
-    enableFixedNatEip: true, // 固定 NAT EIP 有効化フラグ（外部連携先の送信元 IP 許可用）
     dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
@@ -146,7 +144,6 @@ export const environments: Record<string, EnvConfig> = {
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
     vpcEndpointsEnabled: true, // VPC エンドポイント有効化フラグ（prod は有効）
-    enableFixedNatEip: true, // 固定 NAT EIP 有効化フラグ（外部連携先の送信元 IP 許可用）
     dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）

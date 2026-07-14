@@ -49,77 +49,54 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ============================================================
-    // パブリックサブネット作成（2 AZ）
+    // AZ と CIDR のマッピング定義（サブネット批量作成用）
+    // 東京環境固定（dev/stg）、将来 DR（大阪）対応時は environment から AZ リストを取得
     // ============================================================
+    const azConfigs = [
+      { id: '1a', az: 'ap-northeast-1a', pub: '10.0.1.0/24', priv: '10.0.11.0/24', db: '10.0.21.0/24' },
+      { id: '1c', az: 'ap-northeast-1c', pub: '10.0.2.0/24', priv: '10.0.12.0/24', db: '10.0.22.0/24' },
+    ];
 
-    // パブリックサブネット 1a（ap-northeast-1a）
-    const publicSubnet1a = new ec2.CfnSubnet(this, 'PublicSubnet1a', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.1.0/24',
-      availabilityZone: 'ap-northeast-1a',
-      mapPublicIpOnLaunch: true,
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'public-subnet-1a') }],
-    });
-
-    // パブリックサブネット 1c（ap-northeast-1c）
-    const publicSubnet1c = new ec2.CfnSubnet(this, 'PublicSubnet1c', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.2.0/24',
-      availabilityZone: 'ap-northeast-1c',
-      mapPublicIpOnLaunch: true,
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'public-subnet-1c') }],
-    });
+    const selectedAzs = azConfigs.map(c => c.az);
 
     // ============================================================
-    // プライベートサブネット作成（2 AZ）
+    // 各層のサブネット批量作成（2 AZ）
     // ============================================================
+    const publicSubnets = azConfigs.map(c =>
+      new ec2.CfnSubnet(this, `PublicSubnet${c.id}`, {
+        vpcId: cfnVpc.ref,
+        cidrBlock: c.pub,
+        availabilityZone: c.az,
+        mapPublicIpOnLaunch: true,
+        tags: [{ key: 'Name', value: buildResourceName(envName, `public-subnet-${c.id}`) }],
+      }),
+    );
 
-    // プライベートサブネット 1a（ap-northeast-1a）
-    const privateSubnet1a = new ec2.CfnSubnet(this, 'PrivateSubnet1a', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.11.0/24',
-      availabilityZone: 'ap-northeast-1a',
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'private-subnet-1a') }],
-    });
+    const privateSubnets = azConfigs.map(c =>
+      new ec2.CfnSubnet(this, `PrivateSubnet${c.id}`, {
+        vpcId: cfnVpc.ref,
+        cidrBlock: c.priv,
+        availabilityZone: c.az,
+        tags: [{ key: 'Name', value: buildResourceName(envName, `private-subnet-${c.id}`) }],
+      }),
+    );
 
-    // プライベートサブネット 1c（ap-northeast-1c）
-    const privateSubnet1c = new ec2.CfnSubnet(this, 'PrivateSubnet1c', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.12.0/24',
-      availabilityZone: 'ap-northeast-1c',
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'private-subnet-1c') }],
-    });
-
-    // ============================================================
-    // データベースサブネット作成（2 AZ、隔離サブネット）
-    // ============================================================
-
-    // データベースサブネット 1a（ap-northeast-1a）
-    const dbSubnet1a = new ec2.CfnSubnet(this, 'DbSubnet1a', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.21.0/24',
-      availabilityZone: 'ap-northeast-1a',
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'db-subnet-1a') }],
-    });
-
-    // データベースサブネット 1c（ap-northeast-1c）
-    const dbSubnet1c = new ec2.CfnSubnet(this, 'DbSubnet1c', {
-      vpcId: cfnVpc.ref,
-      cidrBlock: '10.0.22.0/24',
-      availabilityZone: 'ap-northeast-1c',
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'db-subnet-1c') }],
-    });
+    const dbSubnets = azConfigs.map(c =>
+      new ec2.CfnSubnet(this, `DbSubnet${c.id}`, {
+        vpcId: cfnVpc.ref,
+        cidrBlock: c.db,
+        availabilityZone: c.az,
+        tags: [{ key: 'Name', value: buildResourceName(envName, `db-subnet-${c.id}`) }],
+      }),
+    );
 
     // ============================================================
     // インターネットゲートウェイ作成・アタッチ
     // ============================================================
-
-    // インターネットゲートウェイ
     const igw = new ec2.CfnInternetGateway(this, 'Igw', {
       tags: [{ key: 'Name', value: buildResourceName(envName, 'igw') }],
     });
 
-    // VPC へのアタッチ
     const igwAttachment = new ec2.CfnVPCGatewayAttachment(this, 'IgwAttachment', {
       vpcId: cfnVpc.ref,
       internetGatewayId: igw.ref,
@@ -127,132 +104,102 @@ export class NetworkStack extends cdk.Stack {
 
     // ============================================================
     // NAT Gateway 用 Elastic IP（固定送信元 IP）
+    // AWS NAT Gateway が 'public' の場合は EIP 必須
     // JPKI や mypage など外部連携先へ通知する送信元 IP として使用する
     // ============================================================
-    const natGatewayEip = envConfig.enableFixedNatEip
-      ? new ec2.CfnEIP(this, 'RegionalNatGatewayEip', {
-          domain: 'vpc',
-          tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip') }],
-        })
-      : undefined;
-    natGatewayEip?.addDependency(igwAttachment);
+    const natGatewayEip = new ec2.CfnEIP(this, 'RegionalNatGatewayEip', {
+      domain: 'vpc',
+      tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip') }],
+    });
+    natGatewayEip.addDependency(igwAttachment);
 
     // ============================================================
     // Regional NAT Gateway 作成
     // VPC 単位の Regional NAT Gateway を作成し、複数 AZ のプライベートサブネットで共用する
     // ============================================================
-
-    // Regional NAT Gateway（サブネット指定なし）
     const regionalNatGateway = new ec2.CfnNatGateway(this, 'RegionalNatGateway', {
       vpcId: cfnVpc.ref,
       availabilityMode: 'regional',
       connectivityType: 'public',
-      allocationId: natGatewayEip?.attrAllocationId,
+      allocationId: natGatewayEip.attrAllocationId,
       tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-gw') }],
     });
     regionalNatGateway.addDependency(igwAttachment);
 
-    if (natGatewayEip) {
-      new cdk.CfnOutput(this, 'RegionalNatGatewayEipAllocationId', {
-        value: natGatewayEip.attrAllocationId,
-      });
+    // ============================================================
+    // EIP 情報を出力（全環境で有効）
+    // ============================================================
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEipAllocationId', {
+      value: natGatewayEip.attrAllocationId,
+    });
 
-      new cdk.CfnOutput(this, 'RegionalNatGatewayEipPublicIp', {
-        value: natGatewayEip.attrPublicIp,
-      });
-    }
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEipPublicIp', {
+      value: natGatewayEip.attrPublicIp,
+    });
 
     // ============================================================
-    // パブリックルートテーブル作成
-    // デフォルトルート: 0.0.0.0/0 → インターネットゲートウェイ
+    // ルートテーブル作成と関連付け
     // ============================================================
 
-    // パブリックルートテーブル
-    
+    // --- パブリックルートテーブル（0.0.0.0/0 → IGW）---
     const publicRouteTable = new ec2.CfnRouteTable(this, 'PublicRouteTable', {
       vpcId: cfnVpc.ref,
       tags: [{ key: 'Name', value: buildResourceName(envName, 'public-rtb') }],
     });
 
-    // デフォルトルート（IGW 向け）
-    new ec2.CfnRoute(this, 'PublicDefaultRoute', {
+    const publicDefaultRoute = new ec2.CfnRoute(this, 'PublicDefaultRoute', {
       routeTableId: publicRouteTable.ref,
       destinationCidrBlock: '0.0.0.0/0',
       gatewayId: igw.ref,
     });
+    publicDefaultRoute.addDependency(igwAttachment);
 
-    // パブリックサブネット 1a をルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'PublicSubnet1aRta', {
-      subnetId: publicSubnet1a.ref,
-      routeTableId: publicRouteTable.ref,
+    publicSubnets.forEach((subnet, index) => {
+      new ec2.CfnSubnetRouteTableAssociation(this, `PublicSubnetRta${index}`, {
+        subnetId: subnet.ref,
+        routeTableId: publicRouteTable.ref,
+      });
     });
 
-    // パブリックサブネット 1c をルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'PublicSubnet1cRta', {
-      subnetId: publicSubnet1c.ref,
-      routeTableId: publicRouteTable.ref,
-    });
-
-    // ============================================================
-    // プライベートルートテーブル作成
-    // デフォルトルート: 0.0.0.0/0 → NAT Gateway
-    // 単一 NAT Gateway 構成のため、1 つのルートテーブルを 2 サブネットで共用
-    // ============================================================
-
-    // プライベートルートテーブル
+    // --- プライベートルートテーブル（0.0.0.0/0 → Regional NAT）---
     const privateRouteTable = new ec2.CfnRouteTable(this, 'PrivateRouteTable', {
       vpcId: cfnVpc.ref,
       tags: [{ key: 'Name', value: buildResourceName(envName, 'private-rtb') }],
     });
 
-    // デフォルトルート（Regional NAT Gateway 向け）
     new ec2.CfnRoute(this, 'PrivateDefaultRoute', {
       routeTableId: privateRouteTable.ref,
       destinationCidrBlock: '0.0.0.0/0',
       natGatewayId: regionalNatGateway.ref,
     });
 
-    // プライベートサブネット 1a をルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'PrivateSubnet1aRta', {
-      subnetId: privateSubnet1a.ref,
-      routeTableId: privateRouteTable.ref,
+    privateSubnets.forEach((subnet, index) => {
+      new ec2.CfnSubnetRouteTableAssociation(this, `PrivateSubnetRta${index}`, {
+        subnetId: subnet.ref,
+        routeTableId: privateRouteTable.ref,
+      });
     });
 
-    // プライベートサブネット 1c を同一ルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'PrivateSubnet1cRta', {
-      subnetId: privateSubnet1c.ref,
-      routeTableId: privateRouteTable.ref,
-    });
-
-    // ============================================================
-    // データベースルートテーブル作成（隔離: デフォルトルートなし）
-    // ============================================================
-
-    // データベースルートテーブル
+    // --- データベースルートテーブル（隔離: デフォルトルートなし）---
     const dbRouteTable = new ec2.CfnRouteTable(this, 'DbRouteTable', {
       vpcId: cfnVpc.ref,
       tags: [{ key: 'Name', value: buildResourceName(envName, 'db-rtb') }],
     });
 
-    // データベースサブネット 1a をルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'DbSubnet1aRta', {
-      subnetId: dbSubnet1a.ref,
-      routeTableId: dbRouteTable.ref,
-    });
-
-    // データベースサブネット 1c をルートテーブルに関連付け
-    new ec2.CfnSubnetRouteTableAssociation(this, 'DbSubnet1cRta', {
-      subnetId: dbSubnet1c.ref,
-      routeTableId: dbRouteTable.ref,
+    dbSubnets.forEach((subnet, index) => {
+      new ec2.CfnSubnetRouteTableAssociation(this, `DbSubnetRta${index}`, {
+        subnetId: subnet.ref,
+        routeTableId: dbRouteTable.ref,
+      });
     });
 
     // ============================================================
     // パブリックプロパティへの代入
     // ============================================================
     this.vpcId = cfnVpc.ref;
-    this.publicSubnetIds = [publicSubnet1a.ref, publicSubnet1c.ref];
-    this.privateSubnetIds = [privateSubnet1a.ref, privateSubnet1c.ref];
-    this.dbSubnetIds = [dbSubnet1a.ref, dbSubnet1c.ref];
+    this.publicSubnetIds = publicSubnets.map(s => s.ref);
+    this.privateSubnetIds = privateSubnets.map(s => s.ref);
+    this.dbSubnetIds = dbSubnets.map(s => s.ref);
 
     // ============================================================
     // L2 VPC オブジェクト生成（fromVpcAttributes を使用）
@@ -261,13 +208,13 @@ export class NetworkStack extends cdk.Stack {
     this.vpc = ec2.Vpc.fromVpcAttributes(this, 'VpcL2', {
       vpcId: cfnVpc.ref,
       vpcCidrBlock: '10.0.0.0/16',
-      availabilityZones: ['ap-northeast-1a', 'ap-northeast-1c'],
-      publicSubnetIds: [publicSubnet1a.ref, publicSubnet1c.ref],
-      publicSubnetRouteTableIds: [publicRouteTable.ref, publicRouteTable.ref],
-      privateSubnetIds: [privateSubnet1a.ref, privateSubnet1c.ref],
-      privateSubnetRouteTableIds: [privateRouteTable.ref, privateRouteTable.ref],
-      isolatedSubnetIds: [dbSubnet1a.ref, dbSubnet1c.ref],
-      isolatedSubnetRouteTableIds: [dbRouteTable.ref, dbRouteTable.ref],
+      availabilityZones: selectedAzs,
+      publicSubnetIds: this.publicSubnetIds,
+      publicSubnetRouteTableIds: publicSubnets.map(() => publicRouteTable.ref),
+      privateSubnetIds: this.privateSubnetIds,
+      privateSubnetRouteTableIds: privateSubnets.map(() => privateRouteTable.ref),
+      isolatedSubnetIds: this.dbSubnetIds,
+      isolatedSubnetRouteTableIds: dbSubnets.map(() => dbRouteTable.ref),
     });
 
     // ============================================================
@@ -286,7 +233,7 @@ export class NetworkStack extends cdk.Stack {
 
       new ec2.CfnVPCEndpoint(this, 'S3GatewayEndpoint', {
         vpcId: cfnVpc.ref,
-        serviceName: `com.amazonaws.ap-northeast-1.s3`,
+        serviceName: cdk.Fn.sub('com.amazonaws.${AWS::Region}.s3', {}),
         vpcEndpointType: 'Gateway',
         routeTableIds: allRouteTableIds,
       });

@@ -45,9 +45,6 @@ export interface EnvConfig {
   /** WAF v2 の有効化（CLOUDFRONT スコープ、CloudFront にアタッチ） */
   enableWaf: boolean;
 
-  /** 固定 NAT EIP の有効化（JPKI/mypage など外部連携先の送信元 IP 許可用） */
-  enableFixedNatEip: boolean;
-
   /** CloudTrail 有効化 */
   enableCloudTrail: boolean;
 
