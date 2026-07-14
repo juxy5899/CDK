@@ -1,5 +1,5 @@
 // アプリケーション名定数
-export const AppName = 'MTI-VideoSystem';
+export const AppName = 'MTI-AsahimyappSystem';
 
 /**
  * 環境設定インターフェース
@@ -39,17 +39,14 @@ export interface EnvConfig {
   /** ACM 証明書 ARN（未確定） */
   certificateArn: string;
 
-  /** WAF JPKI IP Set ARN（未確定） */
-  wafJpkiIpSetArn: string;
-
   /** 外部 Cognito AWS アカウント ID（未確定） */
   externalCognitoAccountId: string;
 
-  /** WAF v2 の有効化（REGIONAL スコープ、ALB にアタッチ） */
+  /** WAF v2 の有効化（CLOUDFRONT スコープ、CloudFront にアタッチ） */
   enableWaf: boolean;
 
-  /** WAF JPKI IP セットに登録する CIDR リスト（空の場合はプレースホルダー） */
-  jpkiAllowedCidrs: string[];
+  /** 固定 NAT EIP の有効化（JPKI/mypage など外部連携先の送信元 IP 許可用） */
+  enableFixedNatEip: boolean;
 
   /** CloudTrail 有効化 */
   enableCloudTrail: boolean;
@@ -59,6 +56,18 @@ export interface EnvConfig {
 
   /** Security Hub 有効化 */
   enableSecurityHub: boolean;
+
+  /** AWS Backup 有効化 */
+  enableBackup: boolean;
+
+  /** Amazon Athena 有効化 */
+  enableAthena: boolean;
+
+  /** Amazon Inspector 有効化 */
+  enableInspector: boolean;
+
+  /** AWS X-Ray 有効化 */
+  enableXray: boolean;
 
   /** イベント処理基盤の有効化 */
   enableEventProcessing: boolean;
@@ -98,6 +107,27 @@ export interface EnvConfig {
 
   /** DLQ への移送までの最大受信回数 */
   eventDlqMaxReceiveCount: number;
+
+  /** Edge スタックのデプロイリージョン（CloudFront/WAF/ACM 用） */
+  edgeRegion: string;
+
+  /** CloudFront 配信用ドメイン名（未確定時はプレースホルダー） */
+  edgeDomainName: string;
+
+  /** Route 53 ホストゾーン名（未確定時はプレースホルダー） */
+  hostedZoneName: string;
+
+  /** Route 53 ホストゾーン ID（未確定時はプレースホルダー） */
+  hostedZoneId: string;
+
+  /** Edge 用 ACM 証明書 ARN（us-east-1、未確定時はプレースホルダー） */
+  edgeCertificateArn: string;
+
+  /** CloudFront の ALB オリジンドメイン名（未確定時はプレースホルダー） */
+  albOriginDomainName: string;
+
+  /** 管理画面静的サイトのデフォルトルートオブジェクト */
+  adminSiteDefaultRootObject: string;
 }
 
 /** 未確定パラメータのプレースホルダープレフィックス */

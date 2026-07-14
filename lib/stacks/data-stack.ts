@@ -3,6 +3,8 @@ import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as backup from 'aws-cdk-lib/aws-backup';
+import * as athena from 'aws-cdk-lib/aws-athena';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { EnvConfig, buildResourceName } from '../config/env-config';
@@ -120,5 +122,58 @@ export class DataStack extends cdk.Stack {
       maxImageCount: 10,
       description: '最新10イメージのみ保持',
     });
+
+    // ────────────────────────────────────────────────
+    // AWS Backup（Aurora + 動画バケット）
+    // 日次バックアップを一元管理し、誤操作時の復旧ポイントを確保する
+    // ────────────────────────────────────────────────
+    if (envConfig.enableBackup) {
+      const backupVault = new backup.BackupVault(this, 'DataBackupVault', {
+        backupVaultName: buildResourceName(envName, 'data-backup-vault').toLowerCase(),
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
+
+      const backupPlan = new backup.BackupPlan(this, 'DataBackupPlan', {
+        backupPlanName: buildResourceName(envName, 'data-daily-backup-plan').toLowerCase(),
+        backupVault,
+      });
+
+      backupPlan.addRule(backup.BackupPlanRule.daily());
+
+      backupPlan.addSelection('DataBackupSelection', {
+        resources: [
+          backup.BackupResource.fromRdsDatabaseCluster(this.auroraCluster),
+          backup.BackupResource.fromArn(this.videoBucket.bucketArn),
+        ],
+      });
+    }
+
+    // ────────────────────────────────────────────────
+    // Athena（ログ分析用）
+    // 結果出力用バケットと Workgroup を定義して SQL 分析基盤を標準化する
+    // ────────────────────────────────────────────────
+    if (envConfig.enableAthena) {
+      const athenaResultsBucket = new s3.Bucket(this, 'AthenaResultsBucket', {
+        bucketName: cdk.PhysicalName.GENERATE_IF_NEEDED,
+        versioned: true,
+        encryption: s3.BucketEncryption.S3_MANAGED,
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+        autoDeleteObjects: false,
+      });
+
+      new athena.CfnWorkGroup(this, 'AthenaWorkgroup', {
+        name: buildResourceName(envName, 'athena-workgroup').toLowerCase(),
+        state: 'ENABLED',
+        recursiveDeleteOption: false,
+        workGroupConfiguration: {
+          enforceWorkGroupConfiguration: true,
+          publishCloudWatchMetricsEnabled: true,
+          resultConfiguration: {
+            outputLocation: `s3://${athenaResultsBucket.bucketName}/results/`,
+          },
+        },
+      });
+    }
   }
 }

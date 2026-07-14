@@ -1,8 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as kms from 'aws-cdk-lib/aws-kms';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -14,7 +12,6 @@ import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-confi
 export interface SecurityStackProps extends cdk.StackProps {
   envName: string;
   envConfig: EnvConfig;
-  vpc: ec2.IVpc;
 }
 
 export class SecurityStack extends cdk.Stack {
@@ -23,9 +20,6 @@ export class SecurityStack extends cdk.Stack {
 
   /** 外部 AWS アカウントの Cognito からの認証フェデレーション用クロスアカウントロール */
   public readonly cognitoCrossAccountRole: iam.Role;
-
-  /** WAF WebACL ARN（WAF 無効時は undefined） */
-  public readonly webAclArn: string | undefined;
 
   constructor(scope: Construct, id: string, props: SecurityStackProps) {
     super(scope, id, props);
@@ -67,99 +61,6 @@ export class SecurityStack extends cdk.Stack {
         resources: [this.cognitoCrossAccountRole.roleArn],
       }),
     );
-
-    // ============================================================
-    // WAF v2 WebACL（REGIONAL スコープ、ALB にアタッチ）
-    // enableWaf フラグが true の場合のみ作成
-    // ============================================================
-    if (envConfig.enableWaf) {
-      // CIDRs が空の場合はプレースホルダー値を使用
-      const jpkiCidrs =
-        envConfig.jpkiAllowedCidrs.length > 0
-          ? envConfig.jpkiAllowedCidrs
-          : ['0.0.0.0/32']; // PLACEHOLDER: 実際の JPKI サーバー CIDR に要更新
-
-      // JPKI IP セット（REGIONAL スコープ）
-      const jpkiIpSet = new wafv2.CfnIPSet(this, 'JpkiIpSet', {
-        name: buildResourceName(envName, 'jpki-ip-set'),
-        scope: 'REGIONAL',
-        ipAddressVersion: 'IPV4',
-        addresses: jpkiCidrs,
-        description: 'JPKI 認証サーバーの許可 IP リスト',
-      });
-
-      // WAF WebACL（REGIONAL: ALB アタッチ用）
-      const webAcl = new wafv2.CfnWebACL(this, 'WebAcl', {
-        name: buildResourceName(envName, 'web-acl'),
-        scope: 'REGIONAL',
-        // デフォルト動作: 許可（マネージドルールでブロック）
-        // TODO: 現在は厳密な JPKI allowlist ではない。
-        // TODO: JPKI のみを許可する要件が確定したら defaultAction を block に変更し、
-        // TODO: 対象パスまたは入口ごとの allowlist 設計へ切り替える。
-        defaultAction: { allow: {} },
-        visibilityConfig: {
-          cloudWatchMetricsEnabled: true,
-          metricName: buildResourceName(envName, 'web-acl-metric'),
-          sampledRequestsEnabled: true,
-        },
-        rules: [
-          // ルール 1: JPKI IP セットからのアクセスを明示的に許可（高優先度）
-          {
-            name: 'AllowJpkiIpSet',
-            priority: 1,
-            action: { allow: {} },
-            statement: {
-              ipSetReferenceStatement: {
-                arn: jpkiIpSet.attrArn,
-              },
-            },
-            visibilityConfig: {
-              cloudWatchMetricsEnabled: true,
-              metricName: 'AllowJpkiIpSet',
-              sampledRequestsEnabled: true,
-            },
-          },
-          // ルール 2: AWS マネージドルール共通ルールセット（悪意あるリクエストをブロック）
-          {
-            name: 'AWSManagedRulesCommonRuleSet',
-            priority: 10,
-            overrideAction: { none: {} },
-            statement: {
-              managedRuleGroupStatement: {
-                vendorName: 'AWS',
-                name: 'AWSManagedRulesCommonRuleSet',
-              },
-            },
-            visibilityConfig: {
-              cloudWatchMetricsEnabled: true,
-              metricName: 'AWSManagedRulesCommonRuleSet',
-              sampledRequestsEnabled: true,
-            },
-          },
-          // ルール 3: AWS マネージドルール既知の不正入力（SQL インジェクション等）
-          {
-            name: 'AWSManagedRulesKnownBadInputsRuleSet',
-            priority: 20,
-            overrideAction: { none: {} },
-            statement: {
-              managedRuleGroupStatement: {
-                vendorName: 'AWS',
-                name: 'AWSManagedRulesKnownBadInputsRuleSet',
-              },
-            },
-            visibilityConfig: {
-              cloudWatchMetricsEnabled: true,
-              metricName: 'AWSManagedRulesKnownBadInputsRuleSet',
-              sampledRequestsEnabled: true,
-            },
-          },
-        ],
-      });
-
-      this.webAclArn = webAcl.attrArn;
-    } else {
-      this.webAclArn = undefined;
-    }
 
     // ============================================================
     // CloudTrail（全 API 操作の記録）
@@ -227,16 +128,16 @@ export class SecurityStack extends cdk.Stack {
     }
 
     // ============================================================
-    // ACM 証明書 — Phase 5 で実装予定
+    // Amazon Inspector（ECR/EC2/Lambda の脆弱性スキャン）
+    // enableInspector フラグが true の場合のみ有効化
     // ============================================================
-    // 以下のリソースは未確定パラメータが確定次第 Phase 5 で追加する:
-    //   1. aws-cdk-lib/aws-certificatemanager の Certificate
-    //      → envConfig.domainName と envConfig.certificateArn が確定したら参照する
-    //   2. Route 53 HostedZone の参照
-    // ============================================================
-
-    // ============================================================
-    // Inspector — Phase 5 で実装予定
-    // ============================================================
+    if (envConfig.enableInspector) {
+      new cdk.CfnResource(this, 'InspectorEnabler', {
+        type: 'AWS::InspectorV2::Enabler',
+        properties: {
+          ResourceTypes: ['ECR', 'EC2', 'LAMBDA'],
+        },
+      });
+    }
   }
 }

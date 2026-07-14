@@ -6,6 +6,7 @@ import { DataStack } from '../lib/stacks/data-stack';
 import { ComputeStack } from '../lib/stacks/compute-stack';
 import { SecurityStack } from '../lib/stacks/security-stack';
 import { EventProcessingStack } from '../lib/stacks/event-processing-stack';
+import { EdgeStack } from '../lib/stacks/edge-stack';
 import { environments } from '../lib/config/environments';
 
 const app = new cdk.App();
@@ -26,7 +27,7 @@ const env: cdk.Environment = {
 };
 
 // 全リソースに付与する共通タグ
-cdk.Tags.of(app).add('Project', 'MTI-VideoSystem');
+cdk.Tags.of(app).add('Project', 'MTI-AsahimyappSystem');
 cdk.Tags.of(app).add('Environment', envName);
 cdk.Tags.of(app).add('ManagedBy', 'CDK');
 
@@ -55,7 +56,6 @@ const securityStack = new SecurityStack(app, `MTI-${envName}-SecurityStack`, {
   env,
   envName,
   envConfig,
-  vpc: networkStack.vpc,
   description: `[${envName}] MTI ビデオシステム - セキュリティ基盤スタック`,
   terminationProtection: envName === 'prod',
 });
@@ -69,7 +69,6 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   vpc: networkStack.vpc,
   appRepository: dataStack.appRepository,
   auroraSecret: dataStack.auroraSecret,
-  webAclArn: securityStack.webAclArn,   // WAF ARN（無効時は undefined）
   description: `[${envName}] MTI ビデオシステム - 計算基盤スタック`,
   terminationProtection: envName === 'prod',
 });
@@ -77,6 +76,20 @@ computeStack.addDependency(networkStack);
 computeStack.addDependency(dataStack);
 // ComputeStack は SecurityStack にも依存（KMS キーを将来使用するため）
 computeStack.addDependency(securityStack);
+
+// エッジスタック（CloudFront/WAF/ACM）
+// CloudFront スコープの WAF と証明書を扱うため us-east-1 に固定する
+const edgeStack = new EdgeStack(app, `MTI-${envName}-EdgeStack`, {
+  env: {
+    account: envConfig.account,
+    region: envConfig.edgeRegion,
+  },
+  envName,
+  envConfig,
+  description: `[${envName}] MTI ビデオシステム - エッジ配信基盤スタック`,
+  terminationProtection: envName === 'prod',
+});
+edgeStack.addDependency(computeStack);
 
 // イベント処理スタック（NetworkStack + DataStack + ComputeStack に依存）
 const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-EventProcessingStack`, {

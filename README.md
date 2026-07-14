@@ -1,37 +1,42 @@
-# MTI ビデオシステム — CDK インフラストラクチャ
+# MTI-AsahimyappSystem — CDK インフラストラクチャ
 
 ## 概要
 
-AWS CDK (TypeScript v2) を使用して MTI ビデオ配信・管理システムのインフラをデプロイします。
-東京リージョン (ap-northeast-1) への高可用デュアル AZ 構成です。
+AWS CDK (TypeScript v2) を使用して MTI-AsahimyappSystem のインフラをデプロイします。
+東京リージョン (ap-northeast-1) の高可用デュアル AZ 構成と、
+Edge リージョン (us-east-1) の CloudFront/WAF 構成を併用します。
 
 ## アーキテクチャ概要
 
 ### スタック構成と依存関係
 
-```
+```text
 NetworkStack  ←─────────────────────────────── 全スタックの基盤
     │
     ├── DataStack        Aurora MySQL / S3 / ECR
     │
-    ├── SecurityStack    KMS / IAM クロスアカウントロール（WAF/ACM は Phase 4）
+    ├── SecurityStack    KMS / IAM クロスアカウントロール / CloudTrail / GuardDuty / Inspector
     │
     ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
     │   （DataStack + SecurityStack にも依存）
     │
     └── EventProcessingStack  EventBridge / SQS / Lambda / CloudWatch Alarm
         （NetworkStack + DataStack + ComputeStack に依存）
+
+EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト S3 / Route 53・ACM 連携
+    （ComputeStack に依存、ALB オリジン設定を参照）
 ```
 
 ### 各スタックのリソース
 
 | スタック | 主なリソース |
-|---------|------------|
-| NetworkStack | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、VPC Endpoints |
-| DataStack | Aurora MySQL 3.04 (T4G.Large)、S3 (動画/Glacier 3年移行)、ECR |
-| SecurityStack | KMS CMK、クロスアカウント IAM Role（WAF/ACM は Phase 4 で追加） |
-| ComputeStack | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling |
+| --- | --- |
+| NetworkStack | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints |
+| DataStack | Aurora MySQL 3.04 (T4G.Large)、S3 (動画/Glacier 3年移行)、ECR、AWS Backup、Athena Workgroup |
+| SecurityStack | KMS CMK、クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector |
+| ComputeStack | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar |
 | EventProcessingStack | EventBridge カスタムバス、BusinessEvent ルール、SQS メイン/DLQ、EventProcessor Lambda、失敗監視アラーム |
+| EdgeStack (us-east-1) | 管理画面静的サイト S3、CloudFront Distribution、WAFv2 (CLOUDFRONT)、Route 53 Alias、ACM 証明書連携 |
 
 ### Phase 5 イベント処理フロー（プレースホルダー実装）
 
@@ -67,13 +72,20 @@ export CDK_DEPLOY_ACCOUNT=123456789012
 | パラメータ | dev | stg | prod |
 |-----------|-----|-----|------|
 | NAT 方式 | Regional | Regional | Regional |
+| 固定 NAT EIP | 任意 | 有効 | 有効 |
 | VPC Endpoints | 無効 | 有効 | 有効 |
 | Aurora Multi-AZ | なし | あり | あり |
 | Fargate CPU/Memory | 256/512 MiB | 512/1024 MiB | 512/1024 MiB |
 | ECS 最小/最大タスク | 1/2 | 2/3 | 2/3 |
+| Backup 有効化 | 無効 | 有効 | 有効 |
+| Athena 有効化 | 無効 | 有効 | 有効 |
+| Inspector 有効化 | 無効 | 有効 | 有効 |
+| X-Ray 有効化 | 有効 | 有効 | 有効 |
+| CloudFront WAF | 無効 | 有効 | 有効 |
 | EventProcessing 有効化 | 有効 | 有効 | 有効 |
 | EventProcessor Timeout / Memory | 30秒 / 256MiB | 60秒 / 512MiB | 60秒 / 512MiB |
 | EventQueue Visibility / Retention / DLQ回数 | 120秒 / 4日 / 3回 | 180秒 / 14日 / 5回 | 180秒 / 14日 / 5回 |
+| Edge リージョン | us-east-1 | us-east-1 | us-east-1 |
 
 ## よく使うコマンド
 
@@ -110,6 +122,9 @@ npx cdk deploy MTI-dev-SecurityStack -c env=dev
 npx cdk deploy MTI-dev-ComputeStack -c env=dev
 npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
 
+# 4. Edge 基盤（CloudFront/WAF）をデプロイ
+npx cdk deploy MTI-dev-EdgeStack -c env=dev
+
 # または全スタックを一括デプロイ（CDK が依存順序を自動解決）
 npx cdk deploy --all -c env=dev
 ```
@@ -133,9 +148,11 @@ npx tsc --noEmit
 
 | パラメータ | フィールド名 | 確定時の対応 |
 |-----------|-------------|-------------|
-| ドメイン名 | `domainName` | Route 53 ホストゾーン作成後に設定 |
-| ACM 証明書 ARN | `certificateArn` | Certificate Manager で発行後に設定 |
-| WAF JPKI IP Set ARN | `wafJpkiIpSetArn` | WAF IP Set 作成後に設定 (Phase 4) |
+| Edge ドメイン名 | `edgeDomainName` | CloudFront 配信用ドメイン確定後に設定 |
+| Edge ACM 証明書 ARN | `edgeCertificateArn` | us-east-1 で証明書発行後に設定 |
+| Route 53 ホストゾーン名 | `hostedZoneName` | 既存ホストゾーン確定後に設定 |
+| Route 53 ホストゾーン ID | `hostedZoneId` | 既存ホストゾーン確定後に設定 |
+| CloudFront ALB オリジン | `albOriginDomainName` | ALB DNS 名確定後に設定 |
 | 外部 Cognito アカウント ID | `externalCognitoAccountId` | 外部チームから連携後に設定 |
 | MediaConvert Endpoint | `mediaConvertEndpoint` | MediaConvert エンドポイント確定後に設定 |
 | MediaConvert Role ARN | `mediaConvertRoleArn` | MediaConvert 実行ロール作成後に設定 |
@@ -147,6 +164,14 @@ npx tsc --noEmit
 - 出力: `processed/`
 
 管理画面からの動画アップロードは `uploads/` 配下に保存し、MediaConvert の出力は `processed/` 配下へ分離する前提です。
+
+### 入出力アクセス制御
+
+- スマートフォンアプリ向け API、管理画面、管理 API は CloudFront 経由で公開します。
+- CloudFront WAF は AWS Managed Rules による一般的な Web 攻撃対策を適用します。
+- 管理画面と管理 API は外部 Cognito とアプリケーション権限でアクセス制御します。
+- JPKI 認証サーバーと mypage サーバーは AWS 環境から外部へアクセスする連携先です。JPKI の OAuth 2.0 Client Credentials 認証はアプリケーション側で実行し、送信元 IP 制限は NAT Gateway の固定 EIP を連携先へ登録します。
+- mypage サーバー連携は固定 NAT EIP を使用します。OAuth 2.0 サーバー認証は現時点では JPKI 連携にのみ適用します。
 
 ## 注意事項
 

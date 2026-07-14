@@ -4,8 +4,8 @@ import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as wafv2 from 'aws-cdk-lib/aws-wafv2';
 import { Construct } from 'constructs';
 import { EnvConfig, buildResourceName } from '../config/env-config';
 
@@ -15,8 +15,6 @@ export interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
   appRepository: ecr.Repository;
   auroraSecret: secretsmanager.ISecret;
-  /** WAF WebACL ARN（SecurityStack から渡す、undefined の場合は関連付けなし） */
-  webAclArn?: string;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -97,6 +95,42 @@ export class ComputeStack extends cdk.Stack {
         DB_SECRET_ARN: ecs.Secret.fromSecretsManager(auroraSecret),
       },
     });
+
+    if (envConfig.enableXray) {
+      // X-Ray SDK がローカルデーモンへ UDP 送信するための接続先
+      container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
+
+      // X-Ray デーモンサイドカー
+      // アプリケーションのトレースを収集し、X-Ray サービスへ転送する
+      this.taskDefinition.addContainer('xray-daemon', {
+        containerName: 'xray-daemon',
+        image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
+        essential: false,
+        logging: ecs.LogDrivers.awsLogs({
+          streamPrefix: buildResourceName(envName, 'xray-daemon'),
+          logRetention: logs.RetentionDays.ONE_MONTH,
+        }),
+      }).addPortMappings({
+        containerPort: 2000,
+        protocol: ecs.Protocol.UDP,
+      });
+
+      // タスクロールに X-Ray 送信権限を付与
+      this.taskDefinition.addToTaskRolePolicy(
+        new iam.PolicyStatement({
+          sid: 'XrayWriteAccess',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'xray:PutTraceSegments',
+            'xray:PutTelemetryRecords',
+            'xray:GetSamplingRules',
+            'xray:GetSamplingTargets',
+            'xray:GetSamplingStatisticSummaries',
+          ],
+          resources: ['*'],
+        }),
+      );
+    }
     // コンテナポートマッピング（8080 番で受信）
     container.addPortMappings({ containerPort: 8080 });
 
@@ -168,15 +202,5 @@ export class ComputeStack extends cdk.Stack {
       scaleInCooldown: cdk.Duration.seconds(300),
     });
 
-    // ────────────────────────────────────────────────
-    // WAF WebACL と ALB の関連付け
-    // webAclArn が提供されている場合のみ実行
-    // ────────────────────────────────────────────────
-    if (props.webAclArn) {
-      new wafv2.CfnWebACLAssociation(this, 'WafAlbAssociation', {
-        resourceArn: this.alb.loadBalancerArn,
-        webAclArn: props.webAclArn,
-      });
-    }
   }
 }

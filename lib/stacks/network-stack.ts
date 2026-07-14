@@ -126,6 +126,18 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ============================================================
+    // NAT Gateway 用 Elastic IP（固定送信元 IP）
+    // JPKI や mypage など外部連携先へ通知する送信元 IP として使用する
+    // ============================================================
+    const natGatewayEip = envConfig.enableFixedNatEip
+      ? new ec2.CfnEIP(this, 'RegionalNatGatewayEip', {
+          domain: 'vpc',
+          tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip') }],
+        })
+      : undefined;
+    natGatewayEip?.addDependency(igwAttachment);
+
+    // ============================================================
     // Regional NAT Gateway 作成
     // VPC 単位の Regional NAT Gateway を作成し、複数 AZ のプライベートサブネットで共用する
     // ============================================================
@@ -135,9 +147,20 @@ export class NetworkStack extends cdk.Stack {
       vpcId: cfnVpc.ref,
       availabilityMode: 'regional',
       connectivityType: 'public',
+      allocationId: natGatewayEip?.attrAllocationId,
       tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-gw') }],
     });
     regionalNatGateway.addDependency(igwAttachment);
+
+    if (natGatewayEip) {
+      new cdk.CfnOutput(this, 'RegionalNatGatewayEipAllocationId', {
+        value: natGatewayEip.attrAllocationId,
+      });
+
+      new cdk.CfnOutput(this, 'RegionalNatGatewayEipPublicIp', {
+        value: natGatewayEip.attrPublicIp,
+      });
+    }
 
     // ============================================================
     // パブリックルートテーブル作成
