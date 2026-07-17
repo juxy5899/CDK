@@ -59,6 +59,50 @@ export interface EnvConfig {
 
   /** Amazon Athena 有効化 */
   enableAthena: boolean;
+  /** データリソースを Stack 削除後も保持するか */
+  retainDataResources: boolean;
+
+  /** メディアアセット格納用 S3 バケット名 */
+  mediaBucketName: string;
+
+  /** Athena クエリ結果出力用 S3 バケット名 */
+  athenaResultsBucketName: string;
+
+  /** 行動ログ Raw データ保存用 S3 バケット名 */
+  actionLogRawBucketName: string;
+
+  /** 行動ログ Raw データ保存用 S3 プレフィックス */
+  actionLogRawPrefix: string;
+
+  /** 行動ログ Athena Partition Projection 開始年 */
+  actionLogProjectionStartYear: number;
+
+  /** 行動ログ Athena Partition Projection 終了年 */
+  actionLogProjectionEndYear: number;
+
+  /** 行動ログ Athena 中間成果物保存用 S3 バケット名 */
+  actionLogIntermediateBucketName: string;
+
+  /** 行動ログ Athena 中間成果物保存用 S3 プレフィックス */
+  actionLogIntermediatePrefix: string;
+
+  /** 行動ログ Delivery TSV 出力用 S3 バケット名 */
+  actionLogDeliveryBucketName: string;
+
+  /** 行動ログ Events Delivery TSV 出力用 S3 プレフィックス */
+  actionLogDeliveryEventsPrefix: string;
+
+  /** 行動ログ Attributes Delivery TSV 出力用 S3 プレフィックス */
+  actionLogDeliveryAttributesPrefix: string;
+
+  /** 行動ログ Delivery TSV 保持日数 */
+  actionLogDeliveryRetentionDays: number;
+
+  /** 管理画面静的サイト用 S3 バケット名 */
+  adminSiteBucketName: string;
+
+  /** CloudTrail ログ保存用 S3 バケット名 */
+  cloudTrailBucketName: string;
 
   /** Amazon Inspector 有効化 */
   enableInspector: boolean;
@@ -75,7 +119,7 @@ export interface EnvConfig {
   /** 管理画面アップロード動画の入力プレフィックス */
   videoUploadPrefix: string;
 
-  /** MediaConvert 出力先プレフィックス */
+  /** CloudFront 配信用公開アセットプレフィックス */
   mediaOutputPrefix: string;
 
   /** MediaConvert エンドポイント（未確定時はプレースホルダー） */
@@ -128,6 +172,12 @@ export interface EnvConfig {
 
   /** 管理画面静的サイトのデフォルトルートオブジェクト */
   adminSiteDefaultRootObject: string;
+
+  /** 行動ログ Athena データベース名 */
+  actionLogAthenaDatabaseName: string;
+
+  /** 行動ログ Raw 外部テーブル名 */
+  actionLogRawTableName: string;
 }
 
 /** 未確定パラメータのプレースホルダープレフィックス */

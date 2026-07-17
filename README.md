@@ -1,8 +1,8 @@
-# MTI-AsahimyappSystem — CDK インフラストラクチャ
+# asahimyapp-infra
 
 ## 概要
 
-AWS CDK (TypeScript v2) を使用して MTI-AsahimyappSystem のインフラをデプロイします。
+asahimyapp-infra は AWS CDK (TypeScript v2) を使用して MTI-AsahimyappSystem のインフラをデプロイします。
 東京リージョン (ap-northeast-1) の高可用デュアル AZ 構成と、
 Edge リージョン (us-east-1) の CloudFront/WAF 構成を併用します。
 
@@ -17,11 +17,11 @@ NetworkStack  ←─────────────────────
     │
     ├── SecurityStack    KMS / IAM クロスアカウントロール / CloudTrail / GuardDuty / Inspector
     │
-    ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
-    │   （DataStack + SecurityStack にも依存）
+    ├── EventProcessingStack  EventBridge / SQS / Lambda / CloudWatch Alarm
+    │   （DataStack にも依存）
     │
-    └── EventProcessingStack  EventBridge / SQS / Lambda / CloudWatch Alarm
-        （NetworkStack + DataStack + ComputeStack に依存）
+    ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
+    │   （DataStack + SecurityStack + EventProcessingStack にも依存）
 
 EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト S3 / Route 53・ACM 連携
     （ComputeStack に依存、ALB オリジン設定を参照）
@@ -32,7 +32,7 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 | スタック | 主なリソース |
 | --- | --- |
 | NetworkStack | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints |
-| DataStack | Aurora MySQL 3.04 (T4G.Large)、S3 (動画/Glacier 3年移行)、ECR、AWS Backup、Athena Workgroup |
+| DataStack | Aurora MySQL 3.04 (T4G.Large)、media S3、ECR、AWS Backup、Athena Workgroup |
 | SecurityStack | KMS CMK、クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector |
 | ComputeStack | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar |
 | EventProcessingStack | EventBridge カスタムバス、BusinessEvent ルール、SQS メイン/DLQ、EventProcessor Lambda、失敗監視アラーム |
@@ -40,10 +40,10 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 
 ### Phase 5 イベント処理フロー（プレースホルダー実装）
 
-1. 管理画面アップロード動画は S3 バケットの `uploads/` プレフィックスに保存  
-2. S3 `Object Created` イベントを EventBridge 経由で SQS メインキューへ配送  
-3. `mti.app` / `BusinessEvent` も EventBridge カスタムバス経由で同キューへ集約  
-4. EventProcessor Lambda が SQS をポーリングし、`submit-media-job` / `send-push` / S3アップロード起点イベントを分岐処理（実行はプレースホルダー）  
+1. 管理画面アップロード media は S3 バケットの `uploads/` プレフィックスに保存  
+2. Spring Boot はアップロード完了 API で S3 オブジェクトを確認し、SQS メインキューへ `process-media-upload` を送信  
+3. `mti.app` / `BusinessEvent` は EventBridge カスタムバス経由で同キューへ集約  
+4. EventProcessor Lambda が SQS をポーリングし、`process-media-upload` / `send-push` / MediaConvert 状態イベントを分岐処理（実行はプレースホルダー）  
 5. `aws.mediaconvert` ステータスイベントを既定バスから同メインキューへ集約  
 6. リトライ超過メッセージは DLQ へ退避し、CloudWatch Alarm で検知
 
@@ -60,7 +60,7 @@ npm install
 ## 環境変数
 
 | 変数名 | 説明 | 必須 |
-|--------|------|------|
+| --- | --- | --- |
 | `CDK_DEPLOY_ACCOUNT` | デプロイ先 AWS アカウント ID | 推奨（未設定時は `CDK_DEFAULT_ACCOUNT` を使用） |
 
 ```bash
@@ -70,7 +70,7 @@ export CDK_DEPLOY_ACCOUNT=123456789012
 ## 環境別設定 (lib/config/environments.ts)
 
 | パラメータ | dev | stg | prod |
-|-----------|-----|-----|------|
+| --- | --- | --- | --- |
 | NAT 方式 | Regional | Regional | Regional |
 | 固定 NAT EIP | 任意 | 有効 | 有効 |
 | VPC Endpoints | 無効 | 有効 | 有効 |
@@ -147,7 +147,7 @@ npx tsc --noEmit
 確定次第 `lib/config/environments.ts` の該当フィールドを更新してください。
 
 | パラメータ | フィールド名 | 確定時の対応 |
-|-----------|-------------|-------------|
+| --- | --- | --- |
 | Edge ドメイン名 | `edgeDomainName` | CloudFront 配信用ドメイン確定後に設定 |
 | Edge ACM 証明書 ARN | `edgeCertificateArn` | us-east-1 で証明書発行後に設定 |
 | Route 53 ホストゾーン名 | `hostedZoneName` | 既存ホストゾーン確定後に設定 |
@@ -160,10 +160,11 @@ npx tsc --noEmit
 | Push Credentials Secret ARN | `pushCredentialsSecretArn` | Secrets Manager シークレット作成後に設定 |
 
 ### 動画アップロード/出力プレフィックス
-- 入力: `uploads/`
-- 出力: `processed/`
 
-管理画面からの動画アップロードは `uploads/` 配下に保存し、MediaConvert の出力は `processed/` 配下へ分離する前提です。
+- 入力: `uploads/`
+- 出力: `public/`
+
+管理画面からの動画アップロードは `uploads/` 配下に保存し、MediaConvert の出力は `public/` 配下へ分離する前提です。
 
 ### 入出力アクセス制御
 
@@ -176,9 +177,11 @@ npx tsc --noEmit
 ## 注意事項
 
 ### 削除保護
+
 Aurora MySQL、S3 バケット、ECR リポジトリ、KMS キーには `RemovalPolicy.RETAIN` が設定されています。
 `cdk destroy` を実行しても**データリソースは削除されません**。手動での削除が必要です。
 
 ### 本番環境の終了保護
+
 `prod` 環境のスタックには `terminationProtection: true` が設定されています。
 誤って `cdk destroy` を実行してもスタックは削除されません。

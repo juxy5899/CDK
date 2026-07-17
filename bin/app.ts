@@ -36,7 +36,7 @@ const networkStack = new NetworkStack(app, `MTI-${envName}-NetworkStack`, {
   env,
   envName,
   envConfig,
-  description: `[${envName}] MTI ビデオシステム - ネットワーク基盤スタック`,
+  description: `[${envName}] MTI あさひマイアプリシステム - ネットワーク基盤スタック`,
   terminationProtection: envName === 'prod',
 });
 
@@ -46,7 +46,7 @@ const dataStack = new DataStack(app, `MTI-${envName}-DataStack`, {
   envName,
   envConfig,
   vpc: networkStack.vpc,
-  description: `[${envName}] MTI ビデオシステム - データ基盤スタック`,
+  description: `[${envName}] MTI あさひマイアプリシステム - データ基盤スタック`,
   terminationProtection: envName === 'prod',
 });
 dataStack.addDependency(networkStack);
@@ -56,12 +56,26 @@ const securityStack = new SecurityStack(app, `MTI-${envName}-SecurityStack`, {
   env,
   envName,
   envConfig,
-  description: `[${envName}] MTI ビデオシステム - セキュリティ基盤スタック`,
+  description: `[${envName}] MTI あさひマイアプリシステム - セキュリティ基盤スタック`,
   terminationProtection: envName === 'prod',
 });
 securityStack.addDependency(networkStack);
 
-// コンピュートスタック（NetworkStack + DataStack に依存）
+// イベント処理スタック（NetworkStack + DataStack に依存）
+const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-EventProcessingStack`, {
+  env,
+  envName,
+  envConfig,
+  vpc: networkStack.vpc,
+  mediaBucket: dataStack.mediaBucket,
+  auroraSecret: dataStack.auroraSecret,
+  description: `[${envName}] MTI あさひマイアプリシステム - イベント処理基盤スタック`,
+  terminationProtection: envName === 'prod',
+});
+eventProcessingStack.addDependency(networkStack);
+eventProcessingStack.addDependency(dataStack);
+
+// コンピュートスタック（NetworkStack + DataStack + EventProcessingStack に依存）
 const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   env,
   envName,
@@ -69,11 +83,13 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   vpc: networkStack.vpc,
   appRepository: dataStack.appRepository,
   auroraSecret: dataStack.auroraSecret,
-  description: `[${envName}] MTI ビデオシステム - 計算基盤スタック`,
+  eventQueue: eventProcessingStack.eventQueue,
+  description: `[${envName}] MTI あさひマイアプリシステム - 計算基盤スタック`,
   terminationProtection: envName === 'prod',
 });
 computeStack.addDependency(networkStack);
 computeStack.addDependency(dataStack);
+computeStack.addDependency(eventProcessingStack);
 // ComputeStack は SecurityStack にも依存（KMS キーを将来使用するため）
 computeStack.addDependency(securityStack);
 
@@ -86,21 +102,8 @@ const edgeStack = new EdgeStack(app, `MTI-${envName}-EdgeStack`, {
   },
   envName,
   envConfig,
-  description: `[${envName}] MTI ビデオシステム - エッジ配信基盤スタック`,
+  description: `[${envName}] MTI あさひマイアプリシステム - エッジ配信基盤スタック`,
   terminationProtection: envName === 'prod',
 });
 edgeStack.addDependency(computeStack);
 
-// イベント処理スタック（NetworkStack + DataStack + ComputeStack に依存）
-const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-EventProcessingStack`, {
-  env,
-  envName,
-  envConfig,
-  vpc: networkStack.vpc,
-  videoBucket: dataStack.videoBucket,
-  description: `[${envName}] MTI ビデオシステム - イベント処理基盤スタック`,
-  terminationProtection: envName === 'prod',
-});
-eventProcessingStack.addDependency(networkStack);
-eventProcessingStack.addDependency(dataStack);
-eventProcessingStack.addDependency(computeStack);

@@ -38,7 +38,7 @@ export class EdgeStack extends cdk.Stack {
     // CloudFront 経由公開を前提にし、バケットの直接公開は無効化する
     // ────────────────────────────────────────────────
     this.adminSiteBucket = new s3.Bucket(this, 'AdminSiteBucket', {
-      bucketName: cdk.PhysicalName.GENERATE_IF_NEEDED,
+      bucketName: envConfig.adminSiteBucketName,
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,

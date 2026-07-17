@@ -69,7 +69,7 @@ export class SecurityStack extends cdk.Stack {
     if (envConfig.enableCloudTrail) {
       // CloudTrail ログ保存用 S3 バケット
       const trailBucket = new s3.Bucket(this, 'TrailBucket', {
-        bucketName: cdk.PhysicalName.GENERATE_IF_NEEDED,
+        bucketName: envConfig.cloudTrailBucketName,
         encryption: s3.BucketEncryption.S3_MANAGED,
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
         versioned: false,

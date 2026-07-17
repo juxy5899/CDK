@@ -5,9 +5,10 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as backup from 'aws-cdk-lib/aws-backup';
 import * as athena from 'aws-cdk-lib/aws-athena';
+import * as glue from 'aws-cdk-lib/aws-glue';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
-import { EnvConfig, buildResourceName } from '../config/env-config';
+import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-config';
 
 export interface DataStackProps extends cdk.StackProps {
   envName: string;
@@ -20,8 +21,14 @@ export class DataStack extends cdk.Stack {
   public readonly auroraCluster: rds.DatabaseCluster;
   /** Aurora 認証情報シークレット */
   public readonly auroraSecret: secretsmanager.ISecret;
-  /** 動画保存用 S3 バケット */
-  public readonly videoBucket: s3.Bucket;
+  /** メディアアセット保存用 S3 バケット */
+  public readonly mediaBucket: s3.Bucket;
+  /** 行動ログ Raw データ保存用 S3 バケット */
+  public readonly actionLogRawBucket: s3.Bucket;
+  /** 行動ログ Athena 中間成果物保存用 S3 バケット */
+  public readonly actionLogIntermediateBucket: s3.Bucket;
+  /** 外部システム向けログ配信用 S3 バケット */
+  public readonly logDeliveryBucket: s3.Bucket;
   /** アプリコンテナイメージ用 ECR リポジトリ */
   public readonly appRepository: ecr.Repository;
 
@@ -29,6 +36,14 @@ export class DataStack extends cdk.Stack {
     super(scope, id, props);
 
     const { envName, envConfig, vpc } = props;
+    const mediaUploadAllowedOrigins = isPlaceholder(envConfig.edgeDomainName)
+      ? undefined
+      : [`https://${envConfig.edgeDomainName}`];
+    // retainDataResources=false は dev 初回構築向け。有効データ投入後は true に変更してから destroy する。
+    const dataRemovalPolicy = envConfig.retainDataResources
+      ? cdk.RemovalPolicy.RETAIN
+      : cdk.RemovalPolicy.DESTROY;
+    const autoDeleteDataObjects = !envConfig.retainDataResources;
 
     // ────────────────────────────────────────────────
     // Aurora MySQL セキュリティグループ
@@ -71,8 +86,8 @@ export class DataStack extends cdk.Stack {
         secretName: buildResourceName(envName, 'aurora-secret'),
       }),
       storageEncrypted: true,
-      deletionProtection: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      deletionProtection: envConfig.retainDataResources,
+      removalPolicy: dataRemovalPolicy,
       vpc,
       // データベースサブネット（isolated）に配置
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
@@ -83,26 +98,84 @@ export class DataStack extends cdk.Stack {
     this.auroraSecret = this.auroraCluster.secret!;
 
     // ────────────────────────────────────────────────
-    // 動画保存用 S3 バケット
-    // バケット名は CDK が自動生成（ハードコードしない）
+    // メディアアセット保存用 S3 バケット
+    // バケット名は環境設定で固定化する
     // ────────────────────────────────────────────────
-    this.videoBucket = new s3.Bucket(this, 'VideoBucket', {
-      bucketName: cdk.PhysicalName.GENERATE_IF_NEEDED,
+    this.mediaBucket = new s3.Bucket(this, 'MediaBucket', {
+      bucketName: envConfig.mediaBucketName,
       versioned: true,
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      eventBridgeEnabled: envConfig.enableEventProcessing,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
+      cors:
+        mediaUploadAllowedOrigins === undefined
+          ? undefined
+          : [
+              {
+                allowedOrigins: mediaUploadAllowedOrigins,
+                allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
+                allowedHeaders: ['*'],
+                exposedHeaders: ['ETag'],
+                maxAge: 3600,
+              },
+            ],
+      removalPolicy: dataRemovalPolicy,
+      autoDeleteObjects: autoDeleteDataObjects,
       lifecycleRules: [
         {
-          // 1095 日（3 年）後に Glacier Deep Archive に移行
+          // アップロード中継領域は一時ファイルとして 3 日後に削除する
+          prefix: envConfig.videoUploadPrefix,
+          expiration: cdk.Duration.days(3),
+          noncurrentVersionExpiration: cdk.Duration.days(3),
+        },
+        {
+          // 正式オブジェクトは保持し、未完了の multipart upload のみ自動クリーンアップする
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+      ],
+    });
+
+    // ────────────────────────────────────────────────
+    // 行動ログ Raw データ保存用 S3 バケット
+    // Fluent Bit / FireLens が出力する JSON ログを Hive パーティション形式で保持する
+    // ────────────────────────────────────────────────
+    this.actionLogRawBucket = new s3.Bucket(this, 'ActionLogRawBucket', {
+      bucketName: envConfig.actionLogRawBucketName,
+      versioned: false,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: dataRemovalPolicy,
+      autoDeleteObjects: autoDeleteDataObjects,
+      lifecycleRules: [
+        {
+          prefix: envConfig.actionLogRawPrefix,
           transitions: [
             {
               storageClass: s3.StorageClass.DEEP_ARCHIVE,
-              transitionAfter: cdk.Duration.days(1095),
+              transitionAfter: cdk.Duration.days(90),
             },
           ],
+          expiration: cdk.Duration.days(365 * 3),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+      ],
+    });
+
+    // ────────────────────────────────────────────────
+    // 行動ログ Athena 中間成果物保存用 S3 バケット
+    // Athena UNLOAD の part-* / manifest を一時保持し、成功時は Lambda が限定削除する
+    // ────────────────────────────────────────────────
+    this.actionLogIntermediateBucket = new s3.Bucket(this, 'ActionLogIntermediateBucket', {
+      bucketName: envConfig.actionLogIntermediateBucketName,
+      versioned: false,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: dataRemovalPolicy,
+      autoDeleteObjects: autoDeleteDataObjects,
+      lifecycleRules: [
+        {
+          prefix: envConfig.actionLogIntermediatePrefix,
+          expiration: cdk.Duration.days(30),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
         },
       ],
     });
@@ -115,7 +188,7 @@ export class DataStack extends cdk.Stack {
       repositoryName: buildResourceName(envName, 'app').toLowerCase(),
       imageScanOnPush: true,
       imageTagMutability: ecr.TagMutability.MUTABLE,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: dataRemovalPolicy,
     });
     // 最新 10 イメージのみ保持するライフサイクルルール
     this.appRepository.addLifecycleRule({
@@ -124,13 +197,40 @@ export class DataStack extends cdk.Stack {
     });
 
     // ────────────────────────────────────────────────
-    // AWS Backup（Aurora + 動画バケット）
+    // 行動ログ Delivery TSV 出力用 S3 バケット
+    // Lambda が生成する TSV.GZ の受け渡し先とする
+    // ────────────────────────────────────────────────
+    this.logDeliveryBucket = new s3.Bucket(this, 'LogDeliveryBucket', {
+      bucketName: envConfig.actionLogDeliveryBucketName,
+      versioned: true,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: dataRemovalPolicy,
+      autoDeleteObjects: autoDeleteDataObjects,
+      lifecycleRules: [
+        {
+          prefix: envConfig.actionLogDeliveryEventsPrefix,
+          expiration: cdk.Duration.days(envConfig.actionLogDeliveryRetentionDays),
+          noncurrentVersionExpiration: cdk.Duration.days(envConfig.actionLogDeliveryRetentionDays),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+        {
+          prefix: envConfig.actionLogDeliveryAttributesPrefix,
+          expiration: cdk.Duration.days(envConfig.actionLogDeliveryRetentionDays),
+          noncurrentVersionExpiration: cdk.Duration.days(envConfig.actionLogDeliveryRetentionDays),
+          abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+        },
+      ],
+    });
+
+    // ────────────────────────────────────────────────
+    // AWS Backup（Aurora + メディアバケット）
     // 日次バックアップを一元管理し、誤操作時の復旧ポイントを確保する
     // ────────────────────────────────────────────────
     if (envConfig.enableBackup) {
       const backupVault = new backup.BackupVault(this, 'DataBackupVault', {
         backupVaultName: buildResourceName(envName, 'data-backup-vault').toLowerCase(),
-        removalPolicy: cdk.RemovalPolicy.RETAIN,
+        removalPolicy: dataRemovalPolicy,
       });
 
       const backupPlan = new backup.BackupPlan(this, 'DataBackupPlan', {
@@ -143,27 +243,29 @@ export class DataStack extends cdk.Stack {
       backupPlan.addSelection('DataBackupSelection', {
         resources: [
           backup.BackupResource.fromRdsDatabaseCluster(this.auroraCluster),
-          backup.BackupResource.fromArn(this.videoBucket.bucketArn),
+          backup.BackupResource.fromArn(this.mediaBucket.bucketArn),
         ],
       });
     }
 
     // ────────────────────────────────────────────────
-    // Athena（ログ分析用）
-    // 結果出力用バケットと Workgroup を定義して SQL 分析基盤を標準化する
+    // Athena / Glue（ログ分析用）
+    // 結果出力用バケット、Workgroup、Raw 外部表を定義して SQL 分析基盤を標準化する
     // ────────────────────────────────────────────────
     if (envConfig.enableAthena) {
       const athenaResultsBucket = new s3.Bucket(this, 'AthenaResultsBucket', {
-        bucketName: cdk.PhysicalName.GENERATE_IF_NEEDED,
+        bucketName: envConfig.athenaResultsBucketName,
         versioned: true,
         encryption: s3.BucketEncryption.S3_MANAGED,
         blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-        removalPolicy: cdk.RemovalPolicy.RETAIN,
-        autoDeleteObjects: false,
+        removalPolicy: dataRemovalPolicy,
+        autoDeleteObjects: autoDeleteDataObjects,
       });
 
+      const athenaWorkgroupName = buildResourceName(envName, 'athena-workgroup').toLowerCase();
+
       new athena.CfnWorkGroup(this, 'AthenaWorkgroup', {
-        name: buildResourceName(envName, 'athena-workgroup').toLowerCase(),
+        name: athenaWorkgroupName,
         state: 'ENABLED',
         recursiveDeleteOption: false,
         workGroupConfiguration: {
@@ -174,6 +276,71 @@ export class DataStack extends cdk.Stack {
           },
         },
       });
+
+      const actionLogDatabase = new glue.CfnDatabase(this, 'ActionLogDatabase', {
+        catalogId: this.account,
+        databaseInput: {
+          name: envConfig.actionLogAthenaDatabaseName,
+          description: 'Action log Athena database',
+        },
+      });
+
+      const actionLogRawLocation = `s3://${this.actionLogRawBucket.bucketName}/${envConfig.actionLogRawPrefix}`;
+      const actionLogRawLocationTemplate = `${actionLogRawLocation}year=\${year}/month=\${month}/day=\${day}/`;
+
+      const actionLogRawTable = new glue.CfnTable(this, 'ActionLogRawTable', {
+        catalogId: this.account,
+        databaseName: envConfig.actionLogAthenaDatabaseName,
+        tableInput: {
+          name: envConfig.actionLogRawTableName,
+          tableType: 'EXTERNAL_TABLE',
+          parameters: {
+            EXTERNAL: 'TRUE',
+            'classification': 'json',
+            'projection.enabled': 'true',
+            'projection.year.type': 'integer',
+            'projection.year.range': `${envConfig.actionLogProjectionStartYear},${envConfig.actionLogProjectionEndYear}`,
+            'projection.year.digits': '4',
+            'projection.month.type': 'integer',
+            'projection.month.range': '1,12',
+            'projection.month.digits': '2',
+            'projection.day.type': 'integer',
+            'projection.day.range': '1,31',
+            'projection.day.digits': '2',
+            'storage.location.template': actionLogRawLocationTemplate,
+          },
+          partitionKeys: [
+            { name: 'year', type: 'string' },
+            { name: 'month', type: 'string' },
+            { name: 'day', type: 'string' },
+          ],
+          storageDescriptor: {
+            location: actionLogRawLocation,
+            inputFormat: 'org.apache.hadoop.mapred.TextInputFormat',
+            outputFormat: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
+            serdeInfo: {
+              serializationLibrary: 'org.openx.data.jsonserde.JsonSerDe',
+              parameters: {
+                'ignore.malformed.json': 'true',
+              },
+            },
+            columns: [
+              {
+                name: 'device_info',
+                type: 'struct<uuid:string,mypage_id:string,os:string,os_version:string,application_version:string>',
+              },
+              {
+                name: 'events',
+                type: 'array<struct<timestamp:string,type:string,screen_name:string,screen_name_id:string,source_screen_name:string,source_screen_id:string,event_category:string,event_action:string,event_label:string,event_value:string>>',
+              },
+              { name: 'server_received_at', type: 'string' },
+              { name: 'ip_address', type: 'string' },
+              { name: 'user_agent', type: 'string' },
+            ],
+          },
+        },
+      });
+      actionLogRawTable.addDependency(actionLogDatabase);
     }
   }
 }

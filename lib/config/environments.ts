@@ -20,12 +20,30 @@ export const environments: Record<string, EnvConfig> = {
     minTaskCount: 1, // ECS サービス最小タスク数
     maxTaskCount: 2, // ECS サービス最大タスク数
     enableBackup: false, // AWS Backup 有効化フラグ
-    enableAthena: false, // Athena（ログ分析基盤）有効化フラグ
+    enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    // dev 初回構築中は destroy で S3 / Aurora を削除する。有効データ投入後は true に変更してから運用する。
+    retainDataResources: false,
     enableInspector: false, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    mediaBucketName: 'asahimyapp-media-assets-dev', // メディアアセット格納用 S3 バケット名
+    athenaResultsBucketName: 'asahimyapp-athena-results-dev', // Athena クエリ結果出力用 S3 バケット名
+    actionLogRawBucketName: 'asahimyapp-action-log-raw-dev', // 行動ログ Raw バケット名
+    actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
+    actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年
+    actionLogProjectionEndYear: 2035, // 行動ログ Athena Partition Projection 終了年
+    actionLogIntermediateBucketName: 'asahimyapp-action-log-intermediate-dev', // 行動ログ Athena 中間成果物バケット名
+    actionLogIntermediatePrefix: 'intermediate/action-log/', // 行動ログ Athena 中間成果物プレフィックス
+    actionLogDeliveryBucketName: 'mti-log-delivery-asahilife-dev', // 行動ログ Delivery TSV 出力用 S3 バケット名
+    actionLogDeliveryEventsPrefix: 'events/', // 行動ログ Events Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryAttributesPrefix: 'attributes/', // 行動ログ Attributes Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryRetentionDays: 7, // 行動ログ Delivery TSV 保持日数
+    actionLogAthenaDatabaseName: 'action_log_dev', // 行動ログ Athena データベース名
+    actionLogRawTableName: 'action_log_raw', // 行動ログ Raw 外部テーブル名
+    adminSiteBucketName: 'asahimyapp-admin-site-dev', // 管理画面静的サイト用 S3 バケット名
+    cloudTrailBucketName: 'asahimyapp-cloudtrail-logs-dev', // CloudTrail ログ保存用 S3 バケット名
     videoUploadPrefix: 'uploads/', // 動画アップロード入力プレフィックス
-    mediaOutputPrefix: 'processed/', // MediaConvert 出力プレフィックス
+    mediaOutputPrefix: 'public/', // CloudFront 配信用公開アセットプレフィックス
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
@@ -75,11 +93,28 @@ export const environments: Record<string, EnvConfig> = {
     maxTaskCount: 3, // ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    mediaBucketName: 'asahimyapp-media-assets-stg', // メディアアセット格納用 S3 バケット名
+    athenaResultsBucketName: 'asahimyapp-athena-results-stg', // Athena クエリ結果出力用 S3 バケット名
+    actionLogRawBucketName: 'asahimyapp-action-log-raw-stg', // 行動ログ Raw バケット名（外部表 location）
+    actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
+    actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年
+    actionLogProjectionEndYear: 2035, // 行動ログ Athena Partition Projection 終了年
+    actionLogIntermediateBucketName: 'asahimyapp-action-log-intermediate-stg', // 行動ログ Athena 中間成果物バケット名
+    actionLogIntermediatePrefix: 'intermediate/action-log/', // 行動ログ Athena 中間成果物プレフィックス
+    actionLogDeliveryEventsPrefix: 'events/', // 行動ログ Events Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryAttributesPrefix: 'attributes/', // 行動ログ Attributes Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryRetentionDays: 30, // 行動ログ Delivery TSV 保持日数
+    actionLogAthenaDatabaseName: 'action_log_stg', // 行動ログ Athena データベース名
+    actionLogRawTableName: 'action_log_raw', // 行動ログ Raw 外部テーブル名
+    actionLogDeliveryBucketName: 'mti-log-delivery-asahilife-stg', // 行動ログ Delivery TSV 出力用 S3 バケット名
+    adminSiteBucketName: 'asahimyapp-admin-site-stg', // 管理画面静的サイト用 S3 バケット名
+    cloudTrailBucketName: 'asahimyapp-cloudtrail-logs-stg', // CloudTrail ログ保存用 S3 バケット名
     videoUploadPrefix: 'uploads/', // 動画アップロード入力プレフィックス
-    mediaOutputPrefix: 'processed/', // MediaConvert 出力プレフィックス
+    mediaOutputPrefix: 'public/', // CloudFront 配信用公開アセットプレフィックス
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
@@ -129,11 +164,28 @@ export const environments: Record<string, EnvConfig> = {
     maxTaskCount: 3, // ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    mediaBucketName: 'asahimyapp-media-assets-prod', // メディアアセット格納用 S3 バケット名
+    athenaResultsBucketName: 'asahimyapp-athena-results-prod', // Athena クエリ結果出力用 S3 バケット名
+    actionLogRawBucketName: 'asahimyapp-action-log-raw-prod', // 行動ログ Raw バケット名（外部表 location）
+    actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
+    actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年
+    actionLogProjectionEndYear: 2035, // 行動ログ Athena Partition Projection 終了年
+    actionLogIntermediateBucketName: 'asahimyapp-action-log-intermediate-prod', // 行動ログ Athena 中間成果物バケット名
+    actionLogIntermediatePrefix: 'intermediate/action-log/', // 行動ログ Athena 中間成果物プレフィックス
+    actionLogDeliveryEventsPrefix: 'events/', // 行動ログ Events Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryAttributesPrefix: 'attributes/', // 属性ログ Attributes Delivery TSV 出力用 S3 プレフィックス
+    actionLogDeliveryRetentionDays: 30, // 行動ログ Delivery TSV 保持日数
+    actionLogAthenaDatabaseName: 'action_log_prod', // 行動ログ Athena データベース名
+    actionLogRawTableName: 'action_log_raw', // 行動ログ Raw 外部テーブル名
+    actionLogDeliveryBucketName: 'mti-log-delivery-asahilife-prod', // 行動ログ Delivery TSV 出力用 S3 バケット名
+    adminSiteBucketName: 'asahimyapp-admin-site-prod', // 管理画面静的サイト用 S3 バケット名
+    cloudTrailBucketName: 'asahimyapp-cloudtrail-logs-prod', // CloudTrail ログ保存用 S3 バケット名
     videoUploadPrefix: 'uploads/', // 動画アップロード入力プレフィックス
-    mediaOutputPrefix: 'processed/', // MediaConvert 出力プレフィックス
+    mediaOutputPrefix: 'public/', // CloudFront 配信用公開アセットプレフィックス
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN

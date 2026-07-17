@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -16,6 +17,7 @@ export interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
   appRepository: ecr.Repository;
   auroraSecret: secretsmanager.ISecret;
+  eventQueue: sqs.IQueue;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -31,7 +33,7 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, appRepository, auroraSecret } = props;
+    const { envName, envConfig, vpc, appRepository, auroraSecret, eventQueue } = props;
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
@@ -107,6 +109,7 @@ export class ComputeStack extends cdk.Stack {
       }),
       environment: {
         APP_ENV: envName,
+        EVENT_QUEUE_URL: eventQueue.queueUrl,
       },
       secrets: {
         // DB 接続情報を Secrets Manager から注入
@@ -149,6 +152,8 @@ export class ComputeStack extends cdk.Stack {
         }),
       );
     }
+
+    eventQueue.grantSendMessages(this.taskDefinition.taskRole);
     // コンテナポートマッピング（8080 番で受信）
     container.addPortMappings({ containerPort: 8080 });
 

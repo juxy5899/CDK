@@ -10,6 +10,7 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-config';
 
@@ -17,7 +18,8 @@ export interface EventProcessingStackProps extends cdk.StackProps {
   envName: string;
   envConfig: EnvConfig;
   vpc: ec2.IVpc;
-  videoBucket: s3.IBucket;
+  mediaBucket: s3.IBucket;
+  auroraSecret: secretsmanager.ISecret;
 }
 
 export class EventProcessingStack extends cdk.Stack {
@@ -33,7 +35,7 @@ export class EventProcessingStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: EventProcessingStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, videoBucket } = props;
+    const { envName, envConfig, vpc, mediaBucket, auroraSecret } = props;
 
     const eventBusName =
       envConfig.eventBusName && envConfig.eventBusName.trim().length > 0
@@ -83,12 +85,15 @@ export class EventProcessingStack extends cdk.Stack {
       handler: 'index.handler',
       timeout: cdk.Duration.seconds(envConfig.eventProcessorTimeoutSec),
       memorySize: envConfig.eventProcessorMemoryMiB,
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       environment: {
         APP_ENV: envName,
         ENABLE_EVENT_PROCESSING: String(envConfig.enableEventProcessing),
         EVENT_BUS_NAME: this.eventBus.eventBusName,
         EVENT_QUEUE_NAME: this.eventQueue.queueName,
-        VIDEO_BUCKET_NAME: videoBucket.bucketName,
+        DB_SECRET_ARN: auroraSecret.secretArn,
+        VIDEO_BUCKET_NAME: mediaBucket.bucketName,
         VIDEO_UPLOAD_PREFIX: envConfig.videoUploadPrefix,
         MEDIA_OUTPUT_PREFIX: envConfig.mediaOutputPrefix,
         VPC_ID: vpc.vpcId,
@@ -104,6 +109,9 @@ export class EventProcessingStack extends cdk.Stack {
         enabled: envConfig.enableEventProcessing,
       }),
     );
+
+    auroraSecret.grantRead(this.eventProcessor);
+    mediaBucket.grantReadWrite(this.eventProcessor);
 
     this.eventProcessor.addToRolePolicy(
       new iam.PolicyStatement({
@@ -143,15 +151,6 @@ export class EventProcessingStack extends cdk.Stack {
                 'mediaconvert:Role': envConfig.mediaConvertRoleArn,
               },
             },
-      }),
-    );
-
-    this.eventProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
-        sid: 'MediaConvertGetJob',
-        effect: iam.Effect.ALLOW,
-        actions: ['mediaconvert:GetJob'],
-        resources: ['*'],
       }),
     );
 
@@ -196,25 +195,6 @@ export class EventProcessingStack extends cdk.Stack {
       enabled: envConfig.enableEventProcessing,
       eventPattern: {
         source: ['aws.mediaconvert'],
-      },
-      targets: [new targets.SqsQueue(this.eventQueue)],
-    });
-
-    // 管理画面アップロード起点の動画処理
-    // S3 バケットで EventBridge を有効化し、uploads/ 配下の Object Created を非同期処理へ渡す。
-    const s3UploadRule = new events.Rule(this, 'S3UploadRule', {
-      enabled: envConfig.enableEventProcessing,
-      eventPattern: {
-        source: ['aws.s3'],
-        detailType: ['Object Created'],
-        detail: {
-          bucket: {
-            name: [videoBucket.bucketName],
-          },
-          object: {
-            key: [{ prefix: envConfig.videoUploadPrefix }],
-          },
-        },
       },
       targets: [new targets.SqsQueue(this.eventQueue)],
     });
@@ -279,22 +259,5 @@ export class EventProcessingStack extends cdk.Stack {
       datapointsToAlarm: 1,
     });
 
-    new cloudwatch.Alarm(this, 'S3UploadRuleFailedInvocationsAlarm', {
-      alarmName: buildResourceName(envName, 's3-upload-rule-failed-invocations'),
-      metric: new cloudwatch.Metric({
-        namespace: 'AWS/Events',
-        metricName: 'FailedInvocations',
-        dimensionsMap: {
-          RuleName: s3UploadRule.ruleName,
-          EventBusName: 'default',
-        },
-        statistic: 'sum',
-        period: cdk.Duration.minutes(5),
-      }),
-      threshold: 1,
-      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
-      evaluationPeriods: 1,
-      datapointsToAlarm: 1,
-    });
   }
 }

@@ -13,6 +13,7 @@
     "declaration": true,
     "experimentalDecorators": true,
     "esModuleInterop": true,
+    "types": ["node"],
     "resolveJsonModule": true
   },
   "exclude": ["node_modules", "dist", "cdk.out"]
