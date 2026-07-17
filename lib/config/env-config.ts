@@ -39,9 +39,6 @@ export interface EnvConfig {
   /** ACM 証明書 ARN（未確定） */
   certificateArn: string;
 
-  /** 外部 Cognito AWS アカウント ID（未確定） */
-  externalCognitoAccountId: string;
-
   /** WAF v2 の有効化（CLOUDFRONT スコープ、CloudFront にアタッチ） */
   enableWaf: boolean;
 
@@ -88,6 +85,12 @@ export interface EnvConfig {
 
   /** 行動ログ Delivery TSV 出力用 S3 バケット名 */
   actionLogDeliveryBucketName: string;
+
+  /** 行動ログ Delivery TSV 取得用の顧客 AWS アカウント ID */
+  actionLogDeliveryCustomerAccountId?: string;
+
+  /** 行動ログ Delivery TSV 取得用 Cross-Account Role の ExternalId */
+  actionLogDeliveryExternalId?: string;
 
   /** 行動ログ Events Delivery TSV 出力用 S3 プレフィックス */
   actionLogDeliveryEventsPrefix: string;

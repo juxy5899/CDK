@@ -58,7 +58,6 @@ export const environments: Record<string, EnvConfig> = {
     auroraMultiAz: false, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
     certificateArn: 'PLACEHOLDER_CERTIFICATE_ARN', // 既存 ACM 証明書 ARN（将来連携用プレースホルダー）
-    externalCognitoAccountId: 'PLACEHOLDER_EXTERNAL_COGNITO_ACCOUNT_ID', // 外部 Cognito 側 AWS アカウント ID
     enableWaf: false, // EdgeStack の CloudFront WAF を有効化するフラグ（dev は無効）
     enableCloudTrail: false, // CloudTrail 有効化フラグ
     enableGuardDuty: false, // GuardDuty 有効化フラグ
@@ -105,6 +104,8 @@ export const environments: Record<string, EnvConfig> = {
     actionLogProjectionEndYear: 2035, // 行動ログ Athena Partition Projection 終了年
     actionLogIntermediateBucketName: 'asahimyapp-action-log-intermediate-stg', // 行動ログ Athena 中間成果物バケット名
     actionLogIntermediatePrefix: 'intermediate/action-log/', // 行動ログ Athena 中間成果物プレフィックス
+    actionLogDeliveryCustomerAccountId: 'PLACEHOLDER_ACTION_LOG_DELIVERY_CUSTOMER_ACCOUNT_ID', // 顧客 AWS アカウント ID
+    actionLogDeliveryExternalId: 'PLACEHOLDER_ACTION_LOG_DELIVERY_EXTERNAL_ID', // 顧客向け Cross-Account Role ExternalId
     actionLogDeliveryEventsPrefix: 'events/', // 行動ログ Events Delivery TSV 出力用 S3 プレフィックス
     actionLogDeliveryAttributesPrefix: 'attributes/', // 行動ログ Attributes Delivery TSV 出力用 S3 プレフィックス
     actionLogDeliveryRetentionDays: 30, // 行動ログ Delivery TSV 保持日数
@@ -129,7 +130,6 @@ export const environments: Record<string, EnvConfig> = {
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
     certificateArn: 'PLACEHOLDER_CERTIFICATE_ARN', // 既存 ACM 証明書 ARN（将来連携用プレースホルダー）
-    externalCognitoAccountId: 'PLACEHOLDER_EXTERNAL_COGNITO_ACCOUNT_ID', // 外部 Cognito 側 AWS アカウント ID
     enableWaf: true, // EdgeStack の CloudFront WAF を有効化するフラグ（stg は有効）
     enableCloudTrail: true, // CloudTrail 有効化フラグ
     enableGuardDuty: true, // GuardDuty 有効化フラグ
@@ -176,6 +176,8 @@ export const environments: Record<string, EnvConfig> = {
     actionLogProjectionEndYear: 2035, // 行動ログ Athena Partition Projection 終了年
     actionLogIntermediateBucketName: 'asahimyapp-action-log-intermediate-prod', // 行動ログ Athena 中間成果物バケット名
     actionLogIntermediatePrefix: 'intermediate/action-log/', // 行動ログ Athena 中間成果物プレフィックス
+    actionLogDeliveryCustomerAccountId: 'PLACEHOLDER_ACTION_LOG_DELIVERY_CUSTOMER_ACCOUNT_ID', // 顧客 AWS アカウント ID
+    actionLogDeliveryExternalId: 'PLACEHOLDER_ACTION_LOG_DELIVERY_EXTERNAL_ID', // 顧客向け Cross-Account Role ExternalId
     actionLogDeliveryEventsPrefix: 'events/', // 行動ログ Events Delivery TSV 出力用 S3 プレフィックス
     actionLogDeliveryAttributesPrefix: 'attributes/', // 属性ログ Attributes Delivery TSV 出力用 S3 プレフィックス
     actionLogDeliveryRetentionDays: 30, // 行動ログ Delivery TSV 保持日数
@@ -200,7 +202,6 @@ export const environments: Record<string, EnvConfig> = {
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
     certificateArn: 'PLACEHOLDER_CERTIFICATE_ARN', // 既存 ACM 証明書 ARN（将来連携用プレースホルダー）
-    externalCognitoAccountId: 'PLACEHOLDER_EXTERNAL_COGNITO_ACCOUNT_ID', // 外部 Cognito 側 AWS アカウント ID
     enableWaf: true, // EdgeStack の CloudFront WAF を有効化するフラグ（prod は有効）
     enableCloudTrail: true, // CloudTrail 有効化フラグ
     enableGuardDuty: true, // GuardDuty 有効化フラグ

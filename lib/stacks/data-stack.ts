@@ -39,11 +39,13 @@ export class DataStack extends cdk.Stack {
     const mediaUploadAllowedOrigins = isPlaceholder(envConfig.edgeDomainName)
       ? undefined
       : [`https://${envConfig.edgeDomainName}`];
+    // prod は設定値にかかわらずデータリソースを保持する。
     // retainDataResources=false は dev 初回構築向け。有効データ投入後は true に変更してから destroy する。
-    const dataRemovalPolicy = envConfig.retainDataResources
+    const shouldRetainDataResources = envName === 'prod' || envConfig.retainDataResources;
+    const dataRemovalPolicy = shouldRetainDataResources
       ? cdk.RemovalPolicy.RETAIN
       : cdk.RemovalPolicy.DESTROY;
-    const autoDeleteDataObjects = !envConfig.retainDataResources;
+    const autoDeleteDataObjects = !shouldRetainDataResources;
 
     // ────────────────────────────────────────────────
     // Aurora MySQL セキュリティグループ
@@ -64,10 +66,17 @@ export class DataStack extends cdk.Stack {
     // Aurora MySQL クラスター（L2 DatabaseCluster）
     // auroraMultiAz が true の場合のみリーダーインスタンスを追加
     // ────────────────────────────────────────────────
+    const dbInstanceClassPattern = /^db\.(.+)$/;
+    const dbInstanceClassMatch = envConfig.dbInstanceClass.match(dbInstanceClassPattern);
+    if (dbInstanceClassMatch === null) {
+      throw new Error(`dbInstanceClass must use the RDS format "db.<family>.<size>": ${envConfig.dbInstanceClass}`);
+    }
+    const auroraInstanceType = new ec2.InstanceType(dbInstanceClassMatch[1]);
+
     const readers = envConfig.auroraMultiAz
       ? [
           rds.ClusterInstance.provisioned('Reader', {
-            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.LARGE),
+            instanceType: auroraInstanceType,
           }),
         ]
       : [];
@@ -77,7 +86,7 @@ export class DataStack extends cdk.Stack {
         version: rds.AuroraMysqlEngineVersion.VER_3_04_0,
       }),
       writer: rds.ClusterInstance.provisioned('Writer', {
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.LARGE),
+        instanceType: auroraInstanceType,
       }),
       readers,
       // DB 名は snake_case（MySQL 命名規則に合わせる）
@@ -86,7 +95,7 @@ export class DataStack extends cdk.Stack {
         secretName: buildResourceName(envName, 'aurora-secret'),
       }),
       storageEncrypted: true,
-      deletionProtection: envConfig.retainDataResources,
+      deletionProtection: shouldRetainDataResources,
       removalPolicy: dataRemovalPolicy,
       vpc,
       // データベースサブネット（isolated）に配置
@@ -96,6 +105,10 @@ export class DataStack extends cdk.Stack {
 
     // クラスターに紐付いたシークレットをエクスポート
     this.auroraSecret = this.auroraCluster.secret!;
+    const auroraSecretResource = this.auroraCluster.node
+      .findChild('Secret')
+      .node.findChild('Resource') as secretsmanager.CfnSecret;
+    auroraSecretResource.applyRemovalPolicy(dataRemovalPolicy);
 
     // ────────────────────────────────────────────────
     // メディアアセット保存用 S3 バケット
@@ -190,10 +203,17 @@ export class DataStack extends cdk.Stack {
       imageTagMutability: ecr.TagMutability.MUTABLE,
       removalPolicy: dataRemovalPolicy,
     });
-    // 最新 10 イメージのみ保持するライフサイクルルール
+    // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
     this.appRepository.addLifecycleRule({
-      maxImageCount: 10,
-      description: '最新10イメージのみ保持',
+      tagStatus: ecr.TagStatus.TAGGED,
+      tagPatternList: ['*'],
+      maxImageAge: cdk.Duration.days(30),
+      description: 'タグ付きイメージを30日保持',
+    });
+    this.appRepository.addLifecycleRule({
+      tagStatus: ecr.TagStatus.UNTAGGED,
+      maxImageAge: cdk.Duration.days(7),
+      description: 'タグなしイメージを7日保持',
     });
 
     // ────────────────────────────────────────────────

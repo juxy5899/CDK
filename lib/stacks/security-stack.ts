@@ -1,5 +1,4 @@
 import * as cdk from 'aws-cdk-lib';
-import * as kms from 'aws-cdk-lib/aws-kms';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudtrail from 'aws-cdk-lib/aws-cloudtrail';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -15,11 +14,8 @@ export interface SecurityStackProps extends cdk.StackProps {
 }
 
 export class SecurityStack extends cdk.Stack {
-  /** データベース・シークレット等の暗号化に使用する KMS カスタマーマネージドキー */
-  public readonly cmk: kms.Key;
-
-  /** 外部 AWS アカウントの Cognito からの認証フェデレーション用クロスアカウントロール */
-  public readonly cognitoCrossAccountRole: iam.Role;
+  /** 顧客 AWS アカウントから行動ログ Delivery TSV を取得するためのクロスアカウントロール */
+  public readonly actionLogDeliveryAccessRole?: iam.Role;
 
   constructor(scope: Construct, id: string, props: SecurityStackProps) {
     super(scope, id, props);
@@ -27,40 +23,62 @@ export class SecurityStack extends cdk.Stack {
     const { envName, envConfig } = props;
 
     // ============================================================
-    // KMS カスタマーマネージドキー
+    // 行動ログ Delivery TSV 取得用クロスアカウント IAM ロール
+    // dev 環境では顧客向け権限を作成しない
     // ============================================================
-    this.cmk = new kms.Key(this, 'Cmk', {
-      description: buildResourceName(envName, 'cmk'),
-      enableKeyRotation: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
+    if (envName !== 'dev') {
+      const customerAccountId = envConfig.actionLogDeliveryCustomerAccountId;
+      const externalId = envConfig.actionLogDeliveryExternalId;
 
-    // ============================================================
-    // クロスアカウント IAM ロール（Cognito フェデレーション用）
-    // ============================================================
-    // envConfig.externalCognitoAccountId がプレースホルダーの場合も synth できるよう
-    // iam.AccountPrincipal でダミー 12 桁アカウント ID を使用する
-    const externalAccountPrincipal = isPlaceholder(envConfig.externalCognitoAccountId)
-      ? new iam.AccountPrincipal('123456789012') // プレースホルダー: 実際の外部アカウント ID に要更新
-      : new iam.AccountPrincipal(envConfig.externalCognitoAccountId);
+      if (!customerAccountId || !externalId) {
+        throw new Error('actionLogDeliveryCustomerAccountId と actionLogDeliveryExternalId を設定してください');
+      }
 
-    this.cognitoCrossAccountRole = new iam.Role(this, 'CognitoCrossAccountRole', {
-      roleName: buildResourceName(envName, 'cognito-cross-account-role'),
-      assumedBy: externalAccountPrincipal,
-      description: '外部 Cognito アカウントからのアクセスを許可するクロスアカウント IAM ロール',
-      // TODO: Phase 5 で permissionsBoundary を追加予定
-      // permissionsBoundary: iam.ManagedPolicy.fromManagedPolicyArn(this, 'PermBoundary', envConfig.crossAccountRolePermissionBoundaryArn),
-    });
+      const customerAccountPrincipal = isPlaceholder(customerAccountId)
+        ? new iam.AccountPrincipal('825269749877') // 部署先 AWS アカウント ID
+        : new iam.AccountPrincipal(customerAccountId);
 
-    // スタブポリシー（Phase 5 で詳細権限に置き換え予定）
-    this.cognitoCrossAccountRole.addToPolicy(
-      new iam.PolicyStatement({
-        sid: 'PlaceholderAssumeRoleStub',
-        effect: iam.Effect.ALLOW,
-        actions: ['sts:AssumeRole'],
-        resources: [this.cognitoCrossAccountRole.roleArn],
-      }),
-    );
+      this.actionLogDeliveryAccessRole = new iam.Role(this, 'ActionLogDeliveryAccessRole', {
+        roleName: buildResourceName(envName, 'action-log-delivery-access-role'),
+        assumedBy: customerAccountPrincipal.withConditions({
+          StringEquals: {
+            'sts:ExternalId': externalId,
+          },
+        }),
+        description: '顧客 AWS アカウントから行動ログ Delivery TSV を取得するためのクロスアカウント IAM ロール',
+      });
+
+      this.actionLogDeliveryAccessRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: 'ListActionLogDeliveryBucket',
+          effect: iam.Effect.ALLOW,
+          actions: ['s3:ListBucket'],
+          resources: [`arn:aws:s3:::${envConfig.actionLogDeliveryBucketName}`],
+          conditions: {
+            StringLike: {
+              's3:prefix': [
+                envConfig.actionLogDeliveryEventsPrefix,
+                `${envConfig.actionLogDeliveryEventsPrefix}*`,
+                envConfig.actionLogDeliveryAttributesPrefix,
+                `${envConfig.actionLogDeliveryAttributesPrefix}*`,
+              ],
+            },
+          },
+        }),
+      );
+
+      this.actionLogDeliveryAccessRole.addToPolicy(
+        new iam.PolicyStatement({
+          sid: 'GetActionLogDeliveryObjects',
+          effect: iam.Effect.ALLOW,
+          actions: ['s3:GetObject'],
+          resources: [
+            `arn:aws:s3:::${envConfig.actionLogDeliveryBucketName}/${envConfig.actionLogDeliveryEventsPrefix}*`,
+            `arn:aws:s3:::${envConfig.actionLogDeliveryBucketName}/${envConfig.actionLogDeliveryAttributesPrefix}*`,
+          ],
+        }),
+      );
+    }
 
     // ============================================================
     // CloudTrail（全 API 操作の記録）
@@ -76,7 +94,7 @@ export class SecurityStack extends cdk.Stack {
         removalPolicy: cdk.RemovalPolicy.RETAIN,
         lifecycleRules: [
           {
-            // CloudTrail ログを 90 日後に Glacier に移行（コスト最適化）
+            // CloudTrail ログを 90 日後に S3 Glacier Flexible Retrieval へ移行（コスト最適化）
             transitions: [
               {
                 storageClass: s3.StorageClass.GLACIER,
@@ -117,7 +135,7 @@ export class SecurityStack extends cdk.Stack {
     // ============================================================
     // Security Hub（セキュリティ標準の自動チェック）
     // enableSecurityHub フラグが true の場合のみ作成
-    // 注意: Security Hub は事前に有効化が必要（初回デプロイ時にエラーになる場合あり）
+    // 注意: Security Hub の標準チェックには AWS Config の有効化が必要（初回デプロイ時にエラーになる場合あり）
     // ============================================================
     if (envConfig.enableSecurityHub) {
       new securityhub.CfnHub(this, 'SecurityHub', {

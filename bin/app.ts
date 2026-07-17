@@ -40,17 +40,6 @@ const networkStack = new NetworkStack(app, `MTI-${envName}-NetworkStack`, {
   terminationProtection: envName === 'prod',
 });
 
-// データスタック（NetworkStack に依存）
-const dataStack = new DataStack(app, `MTI-${envName}-DataStack`, {
-  env,
-  envName,
-  envConfig,
-  vpc: networkStack.vpc,
-  description: `[${envName}] MTI あさひマイアプリシステム - データ基盤スタック`,
-  terminationProtection: envName === 'prod',
-});
-dataStack.addDependency(networkStack);
-
 // セキュリティスタック（NetworkStack に依存）
 const securityStack = new SecurityStack(app, `MTI-${envName}-SecurityStack`, {
   env,
@@ -60,6 +49,18 @@ const securityStack = new SecurityStack(app, `MTI-${envName}-SecurityStack`, {
   terminationProtection: envName === 'prod',
 });
 securityStack.addDependency(networkStack);
+
+// データスタック（NetworkStack + SecurityStack に依存）
+const dataStack = new DataStack(app, `MTI-${envName}-DataStack`, {
+  env,
+  envName,
+  envConfig,
+  vpc: networkStack.vpc,
+  description: `[${envName}] MTI あさひマイアプリシステム - データ基盤スタック`,
+  terminationProtection: envName === 'prod',
+});
+dataStack.addDependency(networkStack);
+dataStack.addDependency(securityStack);
 
 // イベント処理スタック（NetworkStack + DataStack に依存）
 const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-EventProcessingStack`, {
@@ -90,8 +91,6 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
 computeStack.addDependency(networkStack);
 computeStack.addDependency(dataStack);
 computeStack.addDependency(eventProcessingStack);
-// ComputeStack は SecurityStack にも依存（KMS キーを将来使用するため）
-computeStack.addDependency(securityStack);
 
 // エッジスタック（CloudFront/WAF/ACM）
 // CloudFront スコープの WAF と証明書を扱うため us-east-1 に固定する

@@ -13,15 +13,16 @@ Edge リージョン (us-east-1) の CloudFront/WAF 構成を併用します。
 ```text
 NetworkStack  ←─────────────────────────────── 全スタックの基盤
     │
-    ├── DataStack        Aurora MySQL / S3 / ECR
+    ├── SecurityStack    IAM クロスアカウントロール / CloudTrail / GuardDuty / Inspector
     │
-    ├── SecurityStack    KMS / IAM クロスアカウントロール / CloudTrail / GuardDuty / Inspector
+    ├── DataStack        Aurora MySQL / S3 / ECR
+    │   （SecurityStack にも依存）
     │
     ├── EventProcessingStack  EventBridge / SQS / Lambda / CloudWatch Alarm
     │   （DataStack にも依存）
     │
     ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
-    │   （DataStack + SecurityStack + EventProcessingStack にも依存）
+    │   （DataStack + EventProcessingStack にも依存）
 
 EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト S3 / Route 53・ACM 連携
     （ComputeStack に依存、ALB オリジン設定を参照）
@@ -33,7 +34,7 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 | --- | --- |
 | NetworkStack | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints |
 | DataStack | Aurora MySQL 3.04 (T4G.Large)、media S3、ECR、AWS Backup、Athena Workgroup |
-| SecurityStack | KMS CMK、クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector |
+| SecurityStack | クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector |
 | ComputeStack | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar |
 | EventProcessingStack | EventBridge カスタムバス、BusinessEvent ルール、SQS メイン/DLQ、EventProcessor Lambda、失敗監視アラーム |
 | EdgeStack (us-east-1) | 管理画面静的サイト S3、CloudFront Distribution、WAFv2 (CLOUDFRONT)、Route 53 Alias、ACM 証明書連携 |
@@ -114,15 +115,17 @@ npx cdk list -c env=dev
 # 1. ネットワーク基盤を先にデプロイ
 npx cdk deploy MTI-dev-NetworkStack -c env=dev
 
-# 2. データ基盤とセキュリティ基盤をデプロイ（順序不問）
-npx cdk deploy MTI-dev-DataStack -c env=dev
+# 2. セキュリティ基盤をデプロイ
 npx cdk deploy MTI-dev-SecurityStack -c env=dev
 
-# 3. 計算基盤を最後にデプロイ
-npx cdk deploy MTI-dev-ComputeStack -c env=dev
-npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
+# 3. データ基盤をデプロイ
+npx cdk deploy MTI-dev-DataStack -c env=dev
 
-# 4. Edge 基盤（CloudFront/WAF）をデプロイ
+# 4. イベント処理基盤と計算基盤をデプロイ
+npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
+npx cdk deploy MTI-dev-ComputeStack -c env=dev
+
+# 5. Edge 基盤（CloudFront/WAF）をデプロイ
 npx cdk deploy MTI-dev-EdgeStack -c env=dev
 
 # または全スタックを一括デプロイ（CDK が依存順序を自動解決）
@@ -153,7 +156,8 @@ npx tsc --noEmit
 | Route 53 ホストゾーン名 | `hostedZoneName` | 既存ホストゾーン確定後に設定 |
 | Route 53 ホストゾーン ID | `hostedZoneId` | 既存ホストゾーン確定後に設定 |
 | CloudFront ALB オリジン | `albOriginDomainName` | ALB DNS 名確定後に設定 |
-| 外部 Cognito アカウント ID | `externalCognitoAccountId` | 外部チームから連携後に設定 |
+| 行動ログ Delivery 顧客 AWS アカウント ID | `actionLogDeliveryCustomerAccountId` | 顧客 AWS アカウント確定後に設定 |
+| 行動ログ Delivery ExternalId | `actionLogDeliveryExternalId` | 顧客向け Cross-Account Role の ExternalId 確定後に設定 |
 | MediaConvert Endpoint | `mediaConvertEndpoint` | MediaConvert エンドポイント確定後に設定 |
 | MediaConvert Role ARN | `mediaConvertRoleArn` | MediaConvert 実行ロール作成後に設定 |
 | Push Application ID | `pushApplicationId` | Push 配信基盤のアプリ ID 確定後に設定 |
