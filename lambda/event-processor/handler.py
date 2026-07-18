@@ -37,7 +37,7 @@ def handler(event, context):
             )
             continue
 
-        if source == "mti.app" and operation == "send-push":
+        if source == "mti.asahimyapp" and operation == "send-push":
             print(
                 json.dumps(
                     {

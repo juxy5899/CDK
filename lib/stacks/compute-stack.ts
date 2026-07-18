@@ -16,6 +16,8 @@ export interface ComputeStackProps extends cdk.StackProps {
   envConfig: EnvConfig;
   vpc: ec2.IVpc;
   appRepository: ecr.Repository;
+  appImageTag: string;
+  strictValidation: boolean;
   auroraSecret: secretsmanager.ISecret;
   auroraSecurityGroup: ec2.ISecurityGroup;
   eventQueue: sqs.IQueue;
@@ -34,24 +36,49 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, appRepository, auroraSecret, auroraSecurityGroup, eventQueue } = props;
+    const { envName, envConfig, vpc, appRepository, appImageTag, strictValidation, auroraSecret, auroraSecurityGroup, eventQueue } = props;
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
     // CloudFront Origin-Facing プレフィックスリストからのアクセスのみ許可
     // ────────────────────────────────────────────────
     const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
+    const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
+    const hasAppImageTag = !isPlaceholder(appImageTag);
+    const allowDirectAlbAccess = envName === 'dev';
+
+    if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
+      throw new Error(`${envName} requires certificateArn to enable HTTPS between CloudFront and ALB`);
+    }
+
+    if (strictValidation && envName !== 'dev' && !hasOriginVerifyHeader) {
+      throw new Error(`${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`);
+    }
+
+    if (strictValidation && envName !== 'dev' && !hasAppImageTag) {
+      throw new Error(`${envName} requires -c appImageTag=<immutable-image-tag> for ComputeStack deployment`);
+    }
+
+    if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppImageTag)) {
+      cdk.Annotations.of(this).addWarning(
+        'ComputeStack has placeholder deployment inputs. Use -c strictComputeValidation=true with certificateArn, originVerifyHeaderValue, and appImageTag before deploying Compute/Edge.',
+      );
+    }
 
     const albSg = new ec2.SecurityGroup(this, 'AlbSg', {
       vpc,
       description: 'Security group for ALB',
     });
     albSg.addIngressRule(
-      ec2.Peer.prefixList(envConfig.cloudFrontOriginPrefixListId),
+      allowDirectAlbAccess
+        ? ec2.Peer.anyIpv4()
+        : ec2.Peer.prefixList(envConfig.cloudFrontOriginPrefixListId),
       ec2.Port.tcp(hasAlbCertificate ? 443 : 80),
-      hasAlbCertificate
-        ? 'Allow HTTPS access from CloudFront only'
-        : 'Allow HTTP access from CloudFront only',
+      allowDirectAlbAccess
+        ? 'Allow direct HTTP access for dev'
+        : hasAlbCertificate
+          ? 'Allow HTTPS access from CloudFront only'
+          : 'Allow HTTP access from CloudFront only',
     );
 
     // ────────────────────────────────────────────────
@@ -74,12 +101,19 @@ export class ComputeStack extends cdk.Stack {
           certificates: [
             acm.Certificate.fromCertificateArn(this, 'AlbCertificate', envConfig.certificateArn),
           ],
+          defaultAction: elbv2.ListenerAction.fixedResponse(allowDirectAlbAccess ? 404 : 403, {
+            contentType: 'text/plain',
+            messageBody: allowDirectAlbAccess ? 'Not Found' : 'Forbidden',
+          }),
         })
       : this.alb.addListener('HttpListener', {
           port: 80,
           open: false,
+          defaultAction: elbv2.ListenerAction.fixedResponse(allowDirectAlbAccess ? 404 : 403, {
+            contentType: 'text/plain',
+            messageBody: allowDirectAlbAccess ? 'Not Found' : 'Forbidden',
+          }),
         });
-    // TODO: ALB Listener に CloudFront カスタムヘッダー検証ルールを追加する
 
     // ────────────────────────────────────────────────
     // ECS クラスター
@@ -87,9 +121,9 @@ export class ComputeStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc,
-      clusterName: buildResourceName(envName, 'cluster'),
       containerInsightsV2: ecs.ContainerInsights.ENHANCED,
     });
+    cdk.Tags.of(this.cluster).add('Name', buildResourceName(envName, 'cluster'));
 
     // ────────────────────────────────────────────────
     // Fargate タスク定義
@@ -100,23 +134,21 @@ export class ComputeStack extends cdk.Stack {
       memoryLimitMiB: envConfig.taskMemoryMiB,
     });
 
-    // アプリコンテナを追加
-    const container = this.taskDefinition.addContainer('app', {
-      containerName: 'app',
-      image: ecs.ContainerImage.fromEcrRepository(appRepository, 'latest'),
+    // API サービスコンテナを追加
+    const container = this.taskDefinition.addContainer('api-service', {
+      containerName: 'api-service',
+      image: ecs.ContainerImage.fromEcrRepository(appRepository, appImageTag),
       logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: buildResourceName(envName, 'app'),
+        streamPrefix: buildResourceName(envName, 'api-service'),
         logRetention: logs.RetentionDays.ONE_MONTH,
       }),
       environment: {
         APP_ENV: envName,
         EVENT_QUEUE_URL: eventQueue.queueUrl,
-      },
-      secrets: {
-        // DB 接続情報を Secrets Manager から注入
-        DB_SECRET_ARN: ecs.Secret.fromSecretsManager(auroraSecret),
+        DB_SECRET_ARN: auroraSecret.secretArn,
       },
     });
+    auroraSecret.grantRead(this.taskDefinition.taskRole);
 
     if (envConfig.enableXray) {
       // X-Ray SDK がローカルデーモンへ UDP 送信するための接続先
@@ -155,22 +187,21 @@ export class ComputeStack extends cdk.Stack {
     }
 
     eventQueue.grantSendMessages(this.taskDefinition.taskRole);
-    // コンテナポートマッピング（8080 番で受信）
-    container.addPortMappings({ containerPort: 8080 });
+    // コンテナポートマッピング（管理 API: 8080、アプリ API: 8081）
+    container.addPortMappings(
+      { containerPort: 8080 },
+      { containerPort: 8081 },
+    );
 
     // ────────────────────────────────────────────────
     // ECS サービス用セキュリティグループ
-    // ALB SG からのポート 8080 のみ許可
+    // ALB SG からの API ポートのみ許可
     // ────────────────────────────────────────────────
     const serviceSg = new ec2.SecurityGroup(this, 'ServiceSg', {
       vpc,
       description: 'Security group for ECS Fargate service',
     });
-    serviceSg.addIngressRule(
-      ec2.Peer.securityGroupId(albSg.securityGroupId),
-      ec2.Port.tcp(8080),
-      'Allow access from ALB only',
-    );
+    // ALB から ECS Service への Ingress は listener.addTargets() によって自動追加される
 
     new ec2.CfnSecurityGroupIngress(this, 'AuroraIngressFromService', {
       groupId: auroraSecurityGroup.securityGroupId,
@@ -188,7 +219,6 @@ export class ComputeStack extends cdk.Stack {
     this.service = new ecs.FargateService(this, 'Service', {
       cluster: this.cluster,
       taskDefinition: this.taskDefinition,
-      serviceName: buildResourceName(envName, 'service'),
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       desiredCount: envConfig.minTaskCount,
       assignPublicIp: false,
@@ -196,21 +226,54 @@ export class ComputeStack extends cdk.Stack {
       // stg/prod の 2 タスク高可用性を維持するため、ローリングデプロイ中も最小稼働数を保持する
       minHealthyPercent: envConfig.minTaskCount >= 2 ? 100 : 50,
       maxHealthyPercent: 200,
+      healthCheckGracePeriod: cdk.Duration.seconds(90),
       // デプロイ失敗時に自動ロールバック
       circuitBreaker: { rollback: true },
     });
+    cdk.Tags.of(this.service).add('Name', buildResourceName(envName, 'service'));
 
-    // ALB ターゲットグループにサービスを登録
-    listener.addTargets('ServiceTarget', {
+    const apiListenerConditions = (pathPattern: string): elbv2.ListenerCondition[] => {
+      const conditions = [elbv2.ListenerCondition.pathPatterns([pathPattern])];
+      if (!allowDirectAlbAccess) {
+        conditions.push(
+          elbv2.ListenerCondition.httpHeader(
+            envConfig.cloudFrontOriginVerifyHeaderName,
+            [envConfig.cloudFrontOriginVerifyHeaderValue],
+          ),
+        );
+      }
+      return conditions;
+    };
+
+    const mgtApiTargetOptions: elbv2.AddApplicationTargetsProps = {
+      priority: 10,
+      conditions: apiListenerConditions('/mgt-api/*'),
       port: 8080,
       protocol: elbv2.ApplicationProtocol.HTTP,
       targets: [this.service],
       healthCheck: {
-        path: '/health',
+        path: '/actuator/health',
         port: '8080',
         protocol: elbv2.Protocol.HTTP,
       },
-    });
+    };
+
+    const appApiTargetOptions: elbv2.AddApplicationTargetsProps = {
+      priority: 20,
+      conditions: apiListenerConditions('/app-api/*'),
+      port: 8081,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      targets: [this.service],
+      healthCheck: {
+        path: '/actuator/health',
+        port: '8081',
+        protocol: elbv2.Protocol.HTTP,
+      },
+    };
+
+    // ALB ターゲットグループにサービスを登録
+    listener.addTargets('MgtApiTarget', mgtApiTargetOptions);
+    listener.addTargets('AppApiTarget', appApiTargetOptions);
 
     // ────────────────────────────────────────────────
     // Application Auto Scaling
@@ -237,7 +300,7 @@ export class ComputeStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'AlbDnsName', {
       value: this.alb.loadBalancerDnsName,
-      description: 'ALB DNS name. Set this value to albOriginDomainName in environments.ts.',
+      description: 'ALB DNS name used by EdgeStack as the CloudFront API origin.',
     });
 
     if (!hasAlbCertificate) {

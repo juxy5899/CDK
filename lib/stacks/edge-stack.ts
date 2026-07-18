@@ -12,6 +12,8 @@ import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-confi
 export interface EdgeStackProps extends cdk.StackProps {
   envName: string;
   envConfig: EnvConfig;
+  albOriginDomainName: string;
+  strictValidation: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ export class EdgeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: EdgeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig } = props;
+    const { envName, envConfig, albOriginDomainName, strictValidation } = props;
 
     // ────────────────────────────────────────────────
     // 管理画面静的ホスティング用 S3
@@ -54,7 +56,6 @@ export class EdgeStack extends cdk.Stack {
       // マネージドルールで一般的な攻撃を検知・遮断する
       // ────────────────────────────────────────────────
       const webAcl = new wafv2.CfnWebACL(this, 'CloudFrontWebAcl', {
-        name: buildResourceName(envName, 'cf-web-acl'),
         scope: 'CLOUDFRONT',
         defaultAction: { allow: {} },
         visibilityConfig: {
@@ -97,6 +98,7 @@ export class EdgeStack extends cdk.Stack {
           },
         ],
       });
+      cdk.Tags.of(webAcl).add('Name', buildResourceName(envName, 'cf-web-acl'));
 
       webAclArn = webAcl.attrArn;
     }
@@ -105,25 +107,44 @@ export class EdgeStack extends cdk.Stack {
 
     const hasCustomDomain = !isPlaceholder(envConfig.edgeDomainName);
     const hasEdgeCertificate = !isPlaceholder(envConfig.edgeCertificateArn);
-    const hasAlbOriginDomain = !isPlaceholder(envConfig.albOriginDomainName);
     const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
+    const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
 
-    const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {};
-    if (hasAlbOriginDomain) {
-      // API リクエストのみ ALB オリジンへ転送する
-      // TODO: CloudFront オリジンリクエストにカスタムヘッダー（例: X-Origin-Verify）を付与する
-      additionalBehaviors['api/*'] = {
-        origin: new origins.HttpOrigin(envConfig.albOriginDomainName, {
-          protocolPolicy: hasAlbCertificate
-            ? cloudfront.OriginProtocolPolicy.HTTPS_ONLY
-            : cloudfront.OriginProtocolPolicy.HTTP_ONLY,
-        }),
-        viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-        originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
-      };
+    if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
+      throw new Error(`${envName} requires certificateArn to enforce HTTPS_ONLY from CloudFront to ALB`);
     }
+
+    if (strictValidation && envName !== 'dev' && !hasOriginVerifyHeader) {
+      throw new Error(`${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`);
+    }
+
+    if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader)) {
+      cdk.Annotations.of(this).addWarning(
+        'EdgeStack has placeholder ALB origin inputs. Use -c strictComputeValidation=true with certificateArn and originVerifyHeaderValue before deploying Edge.',
+      );
+    }
+
+    const albOrigin = new origins.HttpOrigin(albOriginDomainName, {
+      protocolPolicy: hasAlbCertificate
+        ? cloudfront.OriginProtocolPolicy.HTTPS_ONLY
+        : cloudfront.OriginProtocolPolicy.HTTP_ONLY,
+      customHeaders: {
+        [envConfig.cloudFrontOriginVerifyHeaderName]: envConfig.cloudFrontOriginVerifyHeaderValue,
+      },
+    });
+    const apiBehavior: cloudfront.BehaviorOptions = {
+      origin: albOrigin,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      // Host ヘッダー透過により、CloudFront は ALB Origin の TLS 検証で Viewer Host を SNI として使用する
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
+    };
+
+    const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {
+      'app-api/*': apiBehavior,
+      'mgt-api/*': apiBehavior,
+    };
 
     const baseDistributionProps: cloudfront.DistributionProps = {
       defaultRootObject: envConfig.adminSiteDefaultRootObject,
@@ -151,7 +172,7 @@ export class EdgeStack extends cdk.Stack {
 
     // ────────────────────────────────────────────────
     // CloudFront Distribution
-    // 管理画面静的配信をデフォルトにし、/api/* のみ ALB へルーティングする
+    // 管理画面静的配信をデフォルトにし、API パスのみ ALB へルーティングする
     // ────────────────────────────────────────────────
     this.distribution = new cloudfront.Distribution(this, 'Distribution', distributionProps);
 
@@ -177,13 +198,7 @@ export class EdgeStack extends cdk.Stack {
       });
     }
 
-    if (!hasAlbOriginDomain) {
-      new cdk.CfnOutput(this, 'AlbOriginDomainPlaceholderNotice', {
-        value: 'Set albOriginDomainName in environments.ts to enable /api/* forwarding to ALB',
-      });
-    }
-
-    if (hasAlbOriginDomain && !hasAlbCertificate) {
+    if (!hasAlbCertificate) {
       new cdk.CfnOutput(this, 'AlbOriginHttpFallbackNotice', {
         value: 'Set certificateArn in environments.ts to enforce HTTPS_ONLY from CloudFront to ALB',
       });

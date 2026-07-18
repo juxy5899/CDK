@@ -24,22 +24,22 @@ export class EventProcessingStack extends cdk.Stack {
 
     const { envName, envConfig } = props;
 
-    const eventBusName =
+    const eventBusProps: events.EventBusProps =
       envConfig.eventBusName && envConfig.eventBusName.trim().length > 0
-        ? envConfig.eventBusName
-        : buildResourceName(envName, 'event-bus');
+        ? { eventBusName: envConfig.eventBusName }
+        : {};
+    const dlqRemovalPolicy = envName === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY;
 
-    this.eventBus = new events.EventBus(this, 'EventBus', {
-      eventBusName,
-    });
+    this.eventBus = new events.EventBus(this, 'EventBus', eventBusProps);
 
     this.eventDlq = new sqs.Queue(this, 'EventDlq', {
-      queueName: buildResourceName(envName, 'event-dlq').toLowerCase(),
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
       retentionPeriod: cdk.Duration.days(envConfig.eventQueueRetentionDays),
+      removalPolicy: dlqRemovalPolicy,
     });
 
     this.eventQueue = new sqs.Queue(this, 'EventQueue', {
-      queueName: buildResourceName(envName, 'event-queue').toLowerCase(),
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
       visibilityTimeout: cdk.Duration.seconds(envConfig.eventQueueVisibilityTimeoutSec),
       retentionPeriod: cdk.Duration.days(envConfig.eventQueueRetentionDays),
       deadLetterQueue: {
@@ -52,7 +52,7 @@ export class EventProcessingStack extends cdk.Stack {
       eventBus: this.eventBus,
       enabled: envConfig.enableEventProcessing,
       eventPattern: {
-        source: ['mti.app'],
+        source: ['mti.asahimyapp'],
         detailType: ['BusinessEvent'],
       },
       targets: [new targets.SqsQueue(this.eventQueue)],
@@ -62,6 +62,7 @@ export class EventProcessingStack extends cdk.Stack {
       enabled: envConfig.enableEventProcessing,
       eventPattern: {
         source: ['aws.mediaconvert'],
+        detailType: ['MediaConvert Job State Change'],
       },
       targets: [new targets.SqsQueue(this.eventQueue)],
     });

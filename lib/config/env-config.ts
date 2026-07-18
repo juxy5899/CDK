@@ -170,8 +170,11 @@ export interface EnvConfig {
   /** Edge 用 ACM 証明書 ARN（us-east-1、未確定時はプレースホルダー） */
   edgeCertificateArn: string;
 
-  /** CloudFront の ALB オリジンドメイン名（未確定時はプレースホルダー） */
-  albOriginDomainName: string;
+  /** CloudFront から ALB へ付与する Origin 検証ヘッダー名 */
+  cloudFrontOriginVerifyHeaderName: string;
+
+  /** CloudFront から ALB へ付与する Origin 検証ヘッダー値 */
+  cloudFrontOriginVerifyHeaderValue: string;
 
   /** CloudFront Origin-Facing のマネージドプレフィックスリスト ID */
   cloudFrontOriginPrefixListId: string;

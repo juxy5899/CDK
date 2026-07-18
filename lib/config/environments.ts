@@ -47,7 +47,8 @@ export const environments: Record<string, EnvConfig> = {
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
-    albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginVerifyHeaderName: 'X-Origin-Verify', // CloudFront から ALB へ付与する Origin 検証ヘッダー名
+    cloudFrontOriginVerifyHeaderValue: 'PLACEHOLDER_ORIGIN_VERIFY_HEADER_VALUE', // CloudFront Origin 検証ヘッダー値
     cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================
@@ -120,7 +121,8 @@ export const environments: Record<string, EnvConfig> = {
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
-    albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginVerifyHeaderName: 'X-Origin-Verify', // CloudFront から ALB へ付与する Origin 検証ヘッダー名
+    cloudFrontOriginVerifyHeaderValue: 'PLACEHOLDER_ORIGIN_VERIFY_HEADER_VALUE', // CloudFront Origin 検証ヘッダー値
     cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================
@@ -193,7 +195,8 @@ export const environments: Record<string, EnvConfig> = {
     edgeRegion: 'us-east-1', // EdgeStack デプロイ先リージョン（CloudFront/WAF/ACM 必須）
     edgeDomainName: 'PLACEHOLDER_EDGE_DOMAIN_NAME', // CloudFront カスタムドメイン名
     edgeCertificateArn: 'PLACEHOLDER_EDGE_CERTIFICATE_ARN', // us-east-1 の ACM 証明書 ARN
-    albOriginDomainName: 'PLACEHOLDER_ALB_ORIGIN_DOMAIN_NAME', // CloudFront から中継する ALB のドメイン名
+    cloudFrontOriginVerifyHeaderName: 'X-Origin-Verify', // CloudFront から ALB へ付与する Origin 検証ヘッダー名
+    cloudFrontOriginVerifyHeaderValue: 'PLACEHOLDER_ORIGIN_VERIFY_HEADER_VALUE', // CloudFront Origin 検証ヘッダー値
     cloudFrontOriginPrefixListId: 'pl-58a04531', // ap-northeast-1 の CloudFront Origin-Facing マネージド Prefix List ID
 
     // ============================================================

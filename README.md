@@ -47,7 +47,7 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 
 1. 管理画面アップロード media は S3 バケットの `uploads/` プレフィックスに保存  
 2. Spring Boot はアップロード完了 API で S3 オブジェクトを確認し、SQS メインキューへ `process-media-upload` を送信  
-3. `mti.app` / `BusinessEvent` は EventBridge カスタムバス経由で同キューへ集約  
+3. `mti.asahimyapp` / `BusinessEvent` は EventBridge カスタムバス経由で同キューへ集約  
 4. `aws.mediaconvert` ステータスイベントを既定バスから同メインキューへ集約  
 5. EventProcessor Lambda は `BusinessLambdaStack` に配置し、SQS 消費、VPC 接続、IAM 権限を Lambda ごとに定義  
 6. リトライ超過メッセージは DLQ へ退避し、CloudWatch Alarm で検知
@@ -131,11 +131,26 @@ npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
 npx cdk deploy MTI-dev-BusinessLambdaStack -c env=dev
 npx cdk deploy MTI-dev-ComputeStack -c env=dev
 
-# 5. Edge 基盤（CloudFront/WAF）をデプロイ
+# 5. Edge 基盤（CloudFront/WAF）をデプロイ（CloudFront 経由の動作確認時）
 npx cdk deploy MTI-dev-EdgeStack -c env=dev
 
 # または全スタックを一括デプロイ（CDK が依存順序を自動解決）
 npx cdk deploy --all -c env=dev
+```
+
+### stg/prod Compute・Edge デプロイパラメータ
+
+stg/prod の ComputeStack・EdgeStack をデプロイする場合は、以下の CDK context を指定します。
+
+| context | 用途 | dev の扱い |
+| --- | --- | --- |
+| `appImageTag` | ECS が起動する ECR イメージタグ | 未指定時は `latest` |
+| `originVerifyHeaderValue` | CloudFront から ALB へ付与する Origin 検証ヘッダー値 | プレースホルダー値を使用 |
+| `strictComputeValidation` | stg/prod の Compute・Edge 入力値をデプロイ前に検証するフラグ | 指定不要 |
+
+```bash
+npx cdk deploy MTI-stg-ComputeStack -c env=stg -c appImageTag=20260718-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
+npx cdk deploy MTI-stg-EdgeStack -c env=stg -c appImageTag=20260718-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
 ```
 
 ### 差分確認 (Diff)
@@ -161,7 +176,7 @@ npx tsc --noEmit
 | Edge ACM 証明書 ARN | `edgeCertificateArn` | us-east-1 で証明書発行後に設定 |
 | Route 53 ホストゾーン名 | `hostedZoneName` | 既存ホストゾーン確定後に設定 |
 | Route 53 ホストゾーン ID | `hostedZoneId` | 既存ホストゾーン確定後に設定 |
-| CloudFront ALB オリジン | `albOriginDomainName` | ALB DNS 名確定後に設定 |
+| CloudFront Origin 検証ヘッダー値 | `originVerifyHeaderValue` | Compute/Edge デプロイ時に CDK context で指定 |
 | 行動ログ Delivery 顧客 AWS アカウント ID | `actionLogDeliveryCustomerAccountId` | 顧客 AWS アカウント確定後に設定 |
 | 行動ログ Delivery ExternalId | `actionLogDeliveryExternalId` | 顧客向け Cross-Account Role の ExternalId 確定後に設定 |
 | MediaConvert Endpoint | `mediaConvertEndpoint` | MediaConvert エンドポイント確定後に設定 |
@@ -179,6 +194,7 @@ npx tsc --noEmit
 ### 入出力アクセス制御
 
 - スマートフォンアプリ向け API、管理画面、管理 API は CloudFront 経由で公開します。
+- スマートフォンアプリ向け API は `/app-api/*` から 8081、管理 API は `/mgt-api/*` から 8080 へ転送します。
 - CloudFront WAF は AWS Managed Rules による一般的な Web 攻撃対策を適用します。
 - 管理画面と管理 API は外部 Cognito とアプリケーション権限でアクセス制御します。
 - JPKI 認証サーバーと mypage サーバーは AWS 環境から外部へアクセスする連携先です。JPKI の OAuth 2.0 Client Credentials 認証はアプリケーション側で実行し、送信元 IP 制限は NAT Gateway の固定 EIP を連携先へ登録します。

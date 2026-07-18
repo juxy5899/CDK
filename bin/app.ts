@@ -15,11 +15,22 @@ const app = new cdk.App();
 // コンテキストから環境名を取得（デフォルトは dev）
 // 使用例: cdk synth -c env=dev | cdk synth -c env=stg | cdk synth -c env=prod
 const envName = (app.node.tryGetContext('env') as string) ?? 'dev';
-const envConfig = environments[envName];
+const baseEnvConfig = environments[envName];
 
-if (!envConfig) {
+if (!baseEnvConfig) {
   throw new Error(`環境 "${envName}" の設定が見つかりません。有効な値: dev, stg, prod`);
 }
+
+const originVerifyHeaderValue = app.node.tryGetContext('originVerifyHeaderValue') as string | undefined;
+const envConfig = originVerifyHeaderValue === undefined
+  ? baseEnvConfig
+  : {
+      ...baseEnvConfig,
+      cloudFrontOriginVerifyHeaderValue: originVerifyHeaderValue,
+    };
+const appImageTag = (app.node.tryGetContext('appImageTag') as string | undefined)
+  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_APP_IMAGE_TAG');
+const strictComputeValidation = app.node.tryGetContext('strictComputeValidation') === 'true';
 
 // 共通スタックプロパティ
 const env: cdk.Environment = {
@@ -99,6 +110,8 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   envConfig,
   vpc: networkStack.vpc,
   appRepository: dataStack.appRepository,
+  appImageTag,
+  strictValidation: strictComputeValidation,
   auroraSecret: dataStack.auroraSecret,
   auroraSecurityGroup: dataStack.auroraSecurityGroup,
   eventQueue: eventProcessingStack.eventQueue,
@@ -118,6 +131,8 @@ const edgeStack = new EdgeStack(app, `MTI-${envName}-EdgeStack`, {
   },
   envName,
   envConfig,
+  albOriginDomainName: computeStack.alb.loadBalancerDnsName,
+  strictValidation: strictComputeValidation,
   description: `[${envName}] MTI Asahimyapp System - Edge Delivery Foundation Stack`,
   terminationProtection: envName === 'prod',
 });

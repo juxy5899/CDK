@@ -192,12 +192,12 @@ export class DataStack extends cdk.Stack {
 
     // ────────────────────────────────────────────────
     // アプリコンテナイメージ用 ECR リポジトリ
-    // 外部パイプラインで latest を上書き運用できるようタグを mutable に設定
+    // stg/prod はタグを固定し、デプロイとロールバックの対象を明確化する
     // ────────────────────────────────────────────────
     this.appRepository = new ecr.Repository(this, 'AppRepository', {
-      repositoryName: buildResourceName(envName, 'app').toLowerCase(),
+      repositoryName: buildResourceName(envName, 'api-service').toLowerCase(),
       imageScanOnPush: true,
-      imageTagMutability: ecr.TagMutability.MUTABLE,
+      imageTagMutability: envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
       removalPolicy: dataRemovalPolicy,
     });
     // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
