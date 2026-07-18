@@ -45,7 +45,7 @@ export class SecurityStack extends cdk.Stack {
             'sts:ExternalId': externalId,
           },
         }),
-        description: '顧客 AWS アカウントから行動ログ Delivery TSV を取得するためのクロスアカウント IAM ロール',
+        description: 'Cross-account IAM role for retrieving action log delivery TSV files from the customer AWS account',
       });
 
       this.actionLogDeliveryAccessRole.addToPolicy(

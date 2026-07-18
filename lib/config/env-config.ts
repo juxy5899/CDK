@@ -12,8 +12,11 @@ export interface EnvConfig {
   /** デプロイリージョン */
   region: string;
 
+  /** S3 Gateway Endpoint の有効化 */
+  s3GatewayEndpointEnabled: boolean;
+
   /** VPC Interface Endpoint の有効化（dev:false でコスト削減） */
-  vpcEndpointsEnabled: boolean;
+  interfaceVpcEndpointsEnabled: boolean;
 
   /** Aurora インスタンスクラス文字列（例: 'db.t4g.large'） */
   dbInstanceClass: string;

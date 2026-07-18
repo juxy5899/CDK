@@ -25,7 +25,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: false,
     enableInspector: false, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-dev', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-dev', // Athena クエリ結果出力用 S3 バケット名
     actionLogRawBucketName: 'asahimyapp-action-log-raw-dev', // 行動ログ Raw バケット名
@@ -53,8 +53,9 @@ export const environments: Record<string, EnvConfig> = {
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
-    vpcEndpointsEnabled: false, // VPC エンドポイント有効化フラグ（NAT コスト最適化と通信閉域化）
-    dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
+    s3GatewayEndpointEnabled: true, // S3 Gateway Endpoint 有効化フラグ
+    interfaceVpcEndpointsEnabled: false, // VPC Interface Endpoint 有効化フラグ（dev は固定費を抑制）
+    dbInstanceClass: 'db.t4g.medium', // Aurora の DB インスタンスクラス
     auroraMultiAz: false, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
     certificateArn: 'PLACEHOLDER_CERTIFICATE_ARN', // 既存 ACM 証明書 ARN（将来連携用プレースホルダー）
@@ -95,7 +96,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-stg', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-stg', // Athena クエリ結果出力用 S3 バケット名
     actionLogRawBucketName: 'asahimyapp-action-log-raw-stg', // 行動ログ Raw バケット名（外部表 location）
@@ -125,7 +126,8 @@ export const environments: Record<string, EnvConfig> = {
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
-    vpcEndpointsEnabled: true, // VPC エンドポイント有効化フラグ（stg は有効）
+    s3GatewayEndpointEnabled: true, // S3 Gateway Endpoint 有効化フラグ
+    interfaceVpcEndpointsEnabled: true, // VPC Interface Endpoint 有効化フラグ（stg は有効）
     dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）
@@ -167,7 +169,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: true, // EventBridge/SQS/Lambda のイベント処理基盤有効化フラグ
+    enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-prod', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-prod', // Athena クエリ結果出力用 S3 バケット名
     actionLogRawBucketName: 'asahimyapp-action-log-raw-prod', // 行動ログ Raw バケット名（外部表 location）
@@ -197,7 +199,8 @@ export const environments: Record<string, EnvConfig> = {
     // ============================================================
     // 詳細設定（通常は既定値のまま運用）
     // ============================================================
-    vpcEndpointsEnabled: true, // VPC エンドポイント有効化フラグ（prod は有効）
+    s3GatewayEndpointEnabled: true, // S3 Gateway Endpoint 有効化フラグ
+    interfaceVpcEndpointsEnabled: true, // VPC Interface Endpoint 有効化フラグ（prod は有効）
     dbInstanceClass: 'db.t4g.large', // Aurora の DB インスタンスクラス
     auroraMultiAz: true, // Aurora リーダー追加による Multi-AZ 構成フラグ
     domainName: 'PLACEHOLDER_DOMAIN_NAME', // 既存ドメイン名（将来連携用プレースホルダー）

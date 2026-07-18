@@ -17,6 +17,7 @@ export interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
   appRepository: ecr.Repository;
   auroraSecret: secretsmanager.ISecret;
+  auroraSecurityGroup: ec2.ISecurityGroup;
   eventQueue: sqs.IQueue;
 }
 
@@ -33,7 +34,7 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, appRepository, auroraSecret, eventQueue } = props;
+    const { envName, envConfig, vpc, appRepository, auroraSecret, auroraSecurityGroup, eventQueue } = props;
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
@@ -43,14 +44,14 @@ export class ComputeStack extends cdk.Stack {
 
     const albSg = new ec2.SecurityGroup(this, 'AlbSg', {
       vpc,
-      description: 'ALB 用セキュリティグループ',
+      description: 'Security group for ALB',
     });
     albSg.addIngressRule(
       ec2.Peer.prefixList(envConfig.cloudFrontOriginPrefixListId),
       ec2.Port.tcp(hasAlbCertificate ? 443 : 80),
       hasAlbCertificate
-        ? 'CloudFront からの HTTPS アクセスのみ許可'
-        : 'CloudFront からの HTTP アクセスのみ許可',
+        ? 'Allow HTTPS access from CloudFront only'
+        : 'Allow HTTP access from CloudFront only',
     );
 
     // ────────────────────────────────────────────────
@@ -163,13 +164,22 @@ export class ComputeStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     const serviceSg = new ec2.SecurityGroup(this, 'ServiceSg', {
       vpc,
-      description: 'ECS Fargate サービス用セキュリティグループ',
+      description: 'Security group for ECS Fargate service',
     });
     serviceSg.addIngressRule(
       ec2.Peer.securityGroupId(albSg.securityGroupId),
       ec2.Port.tcp(8080),
-      'ALB からのアクセスのみ許可',
+      'Allow access from ALB only',
     );
+
+    new ec2.CfnSecurityGroupIngress(this, 'AuroraIngressFromService', {
+      groupId: auroraSecurityGroup.securityGroupId,
+      sourceSecurityGroupId: serviceSg.securityGroupId,
+      ipProtocol: 'tcp',
+      fromPort: 3306,
+      toPort: 3306,
+      description: 'Allow MySQL access from ECS Service',
+    });
 
     // ────────────────────────────────────────────────
     // ECS Fargate サービス
@@ -227,7 +237,7 @@ export class ComputeStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'AlbDnsName', {
       value: this.alb.loadBalancerDnsName,
-      description: 'ALB の DNS 名。この値を environments.ts の albOriginDomainName に設定してください',
+      description: 'ALB DNS name. Set this value to albOriginDomainName in environments.ts.',
     });
 
     if (!hasAlbCertificate) {

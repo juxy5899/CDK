@@ -18,8 +18,11 @@ NetworkStack  ←─────────────────────
     ├── DataStack        Aurora MySQL / S3 / ECR
     │   （SecurityStack にも依存）
     │
-    ├── EventProcessingStack  EventBridge / SQS / Lambda / CloudWatch Alarm
+    ├── EventProcessingStack  EventBridge / SQS / CloudWatch Alarm
     │   （DataStack にも依存）
+    │
+    ├── BusinessLambdaStack   EventProcessor Lambda / 業務 Lambda 配置用スタック
+    │   （DataStack + EventProcessingStack にも依存）
     │
     ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
     │   （DataStack + EventProcessingStack にも依存）
@@ -33,19 +36,20 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 | スタック | 主なリソース |
 | --- | --- |
 | NetworkStack | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints |
-| DataStack | Aurora MySQL 3.04 (T4G.Large)、media S3、ECR、AWS Backup、Athena Workgroup |
+| DataStack | Aurora MySQL 3.04 (環境別インスタンスクラス)、media S3、ECR、AWS Backup、Athena Workgroup |
 | SecurityStack | クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector |
 | ComputeStack | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar |
-| EventProcessingStack | EventBridge カスタムバス、BusinessEvent ルール、SQS メイン/DLQ、EventProcessor Lambda、失敗監視アラーム |
+| EventProcessingStack | EventBridge カスタムバス、BusinessEvent ルール、MediaConvert ステータスルール、SQS メイン/DLQ、失敗監視アラーム |
+| BusinessLambdaStack | EventProcessor Lambda、Lambda EventSource、業務 IAM 権限、Lambda 個別の VPC 接続、Lambda 失敗監視アラーム |
 | EdgeStack (us-east-1) | 管理画面静的サイト S3、CloudFront Distribution、WAFv2 (CLOUDFRONT)、Route 53 Alias、ACM 証明書連携 |
 
-### Phase 5 イベント処理フロー（プレースホルダー実装）
+### Phase 5 イベント処理フロー
 
 1. 管理画面アップロード media は S3 バケットの `uploads/` プレフィックスに保存  
 2. Spring Boot はアップロード完了 API で S3 オブジェクトを確認し、SQS メインキューへ `process-media-upload` を送信  
 3. `mti.app` / `BusinessEvent` は EventBridge カスタムバス経由で同キューへ集約  
-4. EventProcessor Lambda が SQS をポーリングし、`process-media-upload` / `send-push` / MediaConvert 状態イベントを分岐処理（実行はプレースホルダー）  
-5. `aws.mediaconvert` ステータスイベントを既定バスから同メインキューへ集約  
+4. `aws.mediaconvert` ステータスイベントを既定バスから同メインキューへ集約  
+5. EventProcessor Lambda は `BusinessLambdaStack` に配置し、SQS 消費、VPC 接続、IAM 権限を Lambda ごとに定義  
 6. リトライ超過メッセージは DLQ へ退避し、CloudWatch Alarm で検知
 
 ## 前提条件
@@ -74,16 +78,17 @@ export CDK_DEPLOY_ACCOUNT=123456789012
 | --- | --- | --- | --- |
 | NAT 方式 | Regional | Regional | Regional |
 | 固定 NAT EIP | 任意 | 有効 | 有効 |
-| VPC Endpoints | 無効 | 有効 | 有効 |
+| S3 Gateway Endpoint | 有効 | 有効 | 有効 |
+| Interface VPC Endpoints | 無効 | 有効 | 有効 |
 | Aurora Multi-AZ | なし | あり | あり |
 | Fargate CPU/Memory | 256/512 MiB | 512/1024 MiB | 512/1024 MiB |
 | ECS 最小/最大タスク | 1/2 | 2/3 | 2/3 |
 | Backup 有効化 | 無効 | 有効 | 有効 |
-| Athena 有効化 | 無効 | 有効 | 有効 |
+| Athena 有効化 | 有効 | 有効 | 有効 |
 | Inspector 有効化 | 無効 | 有効 | 有効 |
 | X-Ray 有効化 | 有効 | 有効 | 有効 |
 | CloudFront WAF | 無効 | 有効 | 有効 |
-| EventProcessing 有効化 | 有効 | 有効 | 有効 |
+| EventBridge ルール有効化 | 無効 | 無効 | 無効 |
 | EventProcessor Timeout / Memory | 30秒 / 256MiB | 60秒 / 512MiB | 60秒 / 512MiB |
 | EventQueue Visibility / Retention / DLQ回数 | 120秒 / 4日 / 3回 | 180秒 / 14日 / 5回 | 180秒 / 14日 / 5回 |
 | Edge リージョン | us-east-1 | us-east-1 | us-east-1 |
@@ -121,8 +126,9 @@ npx cdk deploy MTI-dev-SecurityStack -c env=dev
 # 3. データ基盤をデプロイ
 npx cdk deploy MTI-dev-DataStack -c env=dev
 
-# 4. イベント処理基盤と計算基盤をデプロイ
+# 4. イベント処理基盤、業務 Lambda 配置用スタック、計算基盤をデプロイ
 npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
+npx cdk deploy MTI-dev-BusinessLambdaStack -c env=dev
 npx cdk deploy MTI-dev-ComputeStack -c env=dev
 
 # 5. Edge 基盤（CloudFront/WAF）をデプロイ

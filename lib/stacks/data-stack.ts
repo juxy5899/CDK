@@ -21,6 +21,8 @@ export class DataStack extends cdk.Stack {
   public readonly auroraCluster: rds.DatabaseCluster;
   /** Aurora 認証情報シークレット */
   public readonly auroraSecret: secretsmanager.ISecret;
+  /** Aurora MySQL クラスター用セキュリティグループ */
+  public readonly auroraSecurityGroup: ec2.SecurityGroup;
   /** メディアアセット保存用 S3 バケット */
   public readonly mediaBucket: s3.Bucket;
   /** 行動ログ Raw データ保存用 S3 バケット */
@@ -49,18 +51,13 @@ export class DataStack extends cdk.Stack {
 
     // ────────────────────────────────────────────────
     // Aurora MySQL セキュリティグループ
-    // VPC CIDR (10.0.0.0/16) からのポート 3306 のみ許可
+    // DB アクセス元のスタックから Security Group 単位で 3306 を許可する
     // ────────────────────────────────────────────────
-    const auroraSg = new ec2.SecurityGroup(this, 'AuroraSg', {
+    this.auroraSecurityGroup = new ec2.SecurityGroup(this, 'AuroraSg', {
       vpc,
-      description: 'Aurora MySQL クラスター用セキュリティグループ',
+      description: 'Security group for Aurora MySQL cluster',
       allowAllOutbound: false,
     });
-    auroraSg.addIngressRule(
-      ec2.Peer.ipv4('10.0.0.0/16'),
-      ec2.Port.tcp(3306),
-      'VPC 内からの MySQL アクセスを許可',
-    );
 
     // ────────────────────────────────────────────────
     // Aurora MySQL クラスター（L2 DatabaseCluster）
@@ -100,7 +97,7 @@ export class DataStack extends cdk.Stack {
       vpc,
       // データベースサブネット（isolated）に配置
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
-      securityGroups: [auroraSg],
+      securityGroups: [this.auroraSecurityGroup],
     });
 
     // クラスターに紐付いたシークレットをエクスポート
@@ -208,12 +205,12 @@ export class DataStack extends cdk.Stack {
       tagStatus: ecr.TagStatus.TAGGED,
       tagPatternList: ['*'],
       maxImageAge: cdk.Duration.days(30),
-      description: 'タグ付きイメージを30日保持',
+      description: 'Retain tagged images for 30 days',
     });
     this.appRepository.addLifecycleRule({
       tagStatus: ecr.TagStatus.UNTAGGED,
       maxImageAge: cdk.Duration.days(7),
-      description: 'タグなしイメージを7日保持',
+      description: 'Retain untagged images for 7 days',
     });
 
     // ────────────────────────────────────────────────

@@ -103,15 +103,20 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ============================================================
-    // NAT Gateway 用 Elastic IP（固定送信元 IP）
-    // AWS NAT Gateway が 'public' の場合は EIP 必須
+    // Regional NAT Gateway 用 Elastic IP（AZ ごとの固定送信元 IP）
     // JPKI や mypage など外部連携先へ通知する送信元 IP として使用する
     // ============================================================
-    const natGatewayEip = new ec2.CfnEIP(this, 'RegionalNatGatewayEip', {
+    const natGatewayEip1a = new ec2.CfnEIP(this, 'RegionalNatGatewayEip1a', {
       domain: 'vpc',
-      tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip') }],
+      tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip-1a') }],
     });
-    natGatewayEip.addDependency(igwAttachment);
+    natGatewayEip1a.addDependency(igwAttachment);
+
+    const natGatewayEip1c = new ec2.CfnEIP(this, 'RegionalNatGatewayEip1c', {
+      domain: 'vpc',
+      tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-eip-1c') }],
+    });
+    natGatewayEip1c.addDependency(igwAttachment);
 
     // ============================================================
     // Regional NAT Gateway 作成
@@ -121,7 +126,16 @@ export class NetworkStack extends cdk.Stack {
       vpcId: cfnVpc.ref,
       availabilityMode: 'regional',
       connectivityType: 'public',
-      allocationId: natGatewayEip.attrAllocationId,
+      availabilityZoneAddresses: [
+        {
+          availabilityZone: azConfigs[0].az,
+          allocationIds: [natGatewayEip1a.attrAllocationId],
+        },
+        {
+          availabilityZone: azConfigs[1].az,
+          allocationIds: [natGatewayEip1c.attrAllocationId],
+        },
+      ],
       tags: [{ key: 'Name', value: buildResourceName(envName, 'regional-nat-gw') }],
     });
     regionalNatGateway.addDependency(igwAttachment);
@@ -129,12 +143,20 @@ export class NetworkStack extends cdk.Stack {
     // ============================================================
     // EIP 情報を出力（全環境で有効）
     // ============================================================
-    new cdk.CfnOutput(this, 'RegionalNatGatewayEipAllocationId', {
-      value: natGatewayEip.attrAllocationId,
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEip1aAllocationId', {
+      value: natGatewayEip1a.attrAllocationId,
     });
 
-    new cdk.CfnOutput(this, 'RegionalNatGatewayEipPublicIp', {
-      value: natGatewayEip.attrPublicIp,
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEip1aPublicIp', {
+      value: natGatewayEip1a.attrPublicIp,
+    });
+
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEip1cAllocationId', {
+      value: natGatewayEip1c.attrAllocationId,
+    });
+
+    new cdk.CfnOutput(this, 'RegionalNatGatewayEip1cPublicIp', {
+      value: natGatewayEip1c.attrPublicIp,
     });
 
     // ============================================================
@@ -218,9 +240,9 @@ export class NetworkStack extends cdk.Stack {
     });
 
     // ============================================================
-    // VPC Endpoint 作成（vpcEndpointsEnabled が true の場合のみ）
+    // VPC Endpoint 作成
     // ============================================================
-    if (envConfig.vpcEndpointsEnabled) {
+    if (envConfig.s3GatewayEndpointEnabled) {
       // ──────────────────────────────────────────
       // S3 ゲートウェイエンドポイント（追加コストなし）
       // 全ルートテーブルにルートを追加する
@@ -237,14 +259,19 @@ export class NetworkStack extends cdk.Stack {
         vpcEndpointType: 'Gateway',
         routeTableIds: allRouteTableIds,
       });
+    }
 
+    if (envConfig.interfaceVpcEndpointsEnabled) {
       // ──────────────────────────────────────────
       // インターフェースエンドポイント用セキュリティグループ
       // VPC CIDR（10.0.0.0/16）からの HTTPS アクセスを許可
+      // 現行構成では ECR API / ECR DKR / CloudWatch Logs / Secrets Manager を作成する
+      // SQS / EventBridge / X-Ray / KMS / STS / Lambda / SSM / CloudWatch Monitoring / MediaConvert は、
+      // 対象ワークロードからの利用状況と各サービスの PrivateLink 対応状況に応じて追加する
       // ──────────────────────────────────────────
       const endpointSg = new ec2.SecurityGroup(this, 'EndpointSg', {
         vpc: this.vpc,
-        description: 'VPC Interface Endpoint 用セキュリティグループ',
+        description: 'Security group for VPC interface endpoints',
         securityGroupName: buildResourceName(envName, 'endpoint-sg'),
         allowAllOutbound: false,
       });
@@ -253,7 +280,7 @@ export class NetworkStack extends cdk.Stack {
       endpointSg.addIngressRule(
         ec2.Peer.ipv4('10.0.0.0/16'),
         ec2.Port.tcp(443),
-        'VPC 内部からの HTTPS アクセスを許可',
+        'Allow HTTPS access from inside the VPC',
       );
 
       // プライベートサブネット選択設定（インターフェースエンドポイント配置先）

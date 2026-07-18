@@ -6,6 +6,7 @@ import { DataStack } from '../lib/stacks/data-stack';
 import { ComputeStack } from '../lib/stacks/compute-stack';
 import { SecurityStack } from '../lib/stacks/security-stack';
 import { EventProcessingStack } from '../lib/stacks/event-processing-stack';
+import { BusinessLambdaStack } from '../lib/stacks/business-lambda-stack';
 import { EdgeStack } from '../lib/stacks/edge-stack';
 import { environments } from '../lib/config/environments';
 
@@ -36,7 +37,7 @@ const networkStack = new NetworkStack(app, `MTI-${envName}-NetworkStack`, {
   env,
   envName,
   envConfig,
-  description: `[${envName}] MTI あさひマイアプリシステム - ネットワーク基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Network Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 
@@ -45,7 +46,7 @@ const securityStack = new SecurityStack(app, `MTI-${envName}-SecurityStack`, {
   env,
   envName,
   envConfig,
-  description: `[${envName}] MTI あさひマイアプリシステム - セキュリティ基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Security Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 securityStack.addDependency(networkStack);
@@ -56,7 +57,7 @@ const dataStack = new DataStack(app, `MTI-${envName}-DataStack`, {
   envName,
   envConfig,
   vpc: networkStack.vpc,
-  description: `[${envName}] MTI あさひマイアプリシステム - データ基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Data Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 dataStack.addDependency(networkStack);
@@ -67,14 +68,29 @@ const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-Event
   env,
   envName,
   envConfig,
-  vpc: networkStack.vpc,
-  mediaBucket: dataStack.mediaBucket,
-  auroraSecret: dataStack.auroraSecret,
-  description: `[${envName}] MTI あさひマイアプリシステム - イベント処理基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Event Processing Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 eventProcessingStack.addDependency(networkStack);
 eventProcessingStack.addDependency(dataStack);
+
+// ビジネス Lambda スタック（業務処理 Lambda は要件確定後に追加する）
+const businessLambdaStack = new BusinessLambdaStack(app, `MTI-${envName}-BusinessLambdaStack`, {
+  env,
+  envName,
+  envConfig,
+  vpc: networkStack.vpc,
+  mediaBucket: dataStack.mediaBucket,
+  auroraSecret: dataStack.auroraSecret,
+  auroraSecurityGroup: dataStack.auroraSecurityGroup,
+  eventBus: eventProcessingStack.eventBus,
+  eventQueue: eventProcessingStack.eventQueue,
+  description: `[${envName}] MTI Asahimyapp System - Business Lambda Stack`,
+  terminationProtection: envName === 'prod',
+});
+businessLambdaStack.addDependency(networkStack);
+businessLambdaStack.addDependency(dataStack);
+businessLambdaStack.addDependency(eventProcessingStack);
 
 // コンピュートスタック（NetworkStack + DataStack + EventProcessingStack に依存）
 const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
@@ -84,8 +100,9 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   vpc: networkStack.vpc,
   appRepository: dataStack.appRepository,
   auroraSecret: dataStack.auroraSecret,
+  auroraSecurityGroup: dataStack.auroraSecurityGroup,
   eventQueue: eventProcessingStack.eventQueue,
-  description: `[${envName}] MTI あさひマイアプリシステム - 計算基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Compute Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 computeStack.addDependency(networkStack);
@@ -101,7 +118,7 @@ const edgeStack = new EdgeStack(app, `MTI-${envName}-EdgeStack`, {
   },
   envName,
   envConfig,
-  description: `[${envName}] MTI あさひマイアプリシステム - エッジ配信基盤スタック`,
+  description: `[${envName}] MTI Asahimyapp System - Edge Delivery Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 edgeStack.addDependency(computeStack);
