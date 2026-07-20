@@ -7,6 +7,7 @@ import * as backup from 'aws-cdk-lib/aws-backup';
 import * as athena from 'aws-cdk-lib/aws-athena';
 import * as glue from 'aws-cdk-lib/aws-glue';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { EnvConfig, buildResourceName, isPlaceholder } from '../config/env-config';
 
@@ -31,8 +32,10 @@ export class DataStack extends cdk.Stack {
   public readonly actionLogIntermediateBucket: s3.Bucket;
   /** 外部システム向けログ配信用 S3 バケット */
   public readonly logDeliveryBucket: s3.Bucket;
-  /** アプリコンテナイメージ用 ECR リポジトリ */
-  public readonly appRepository: ecr.Repository;
+  /** アプリ API コンテナイメージ用 ECR リポジトリ */
+  public readonly appApiRepository: ecr.Repository;
+  /** 管理 API コンテナイメージ用 ECR リポジトリ */
+  public readonly mgtApiRepository: ecr.Repository;
 
   constructor(scope: Construct, id: string, props: DataStackProps) {
     super(scope, id, props);
@@ -106,6 +109,68 @@ export class DataStack extends cdk.Stack {
       .findChild('Secret')
       .node.findChild('Resource') as secretsmanager.CfnSecret;
     auroraSecretResource.applyRemovalPolicy(dataRemovalPolicy);
+
+    if (envName === 'dev') {
+      const debugDbTunnelSg = new ec2.SecurityGroup(this, 'DebugDbTunnelSg', {
+        vpc,
+        description: 'Security group for dev DB tunnel instance',
+        allowAllOutbound: false,
+      });
+      debugDbTunnelSg.addEgressRule(
+        ec2.Peer.anyIpv4(),
+        ec2.Port.tcp(443),
+        'Allow SSM agent outbound HTTPS',
+      );
+      debugDbTunnelSg.addEgressRule(
+        this.auroraSecurityGroup,
+        ec2.Port.tcp(3306),
+        'Allow MySQL access to Aurora',
+      );
+
+      this.auroraSecurityGroup.addIngressRule(
+        debugDbTunnelSg,
+        ec2.Port.tcp(3306),
+        'Allow MySQL access from dev DB tunnel instance',
+      );
+
+      const debugDbTunnelRole = new iam.Role(this, 'DebugDbTunnelRole', {
+        assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
+        managedPolicies: [
+          iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
+        ],
+      });
+
+      const debugDbTunnelInstance = new ec2.Instance(this, 'DebugDbTunnelInstance', {
+        vpc,
+        instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.NANO),
+        machineImage: ec2.MachineImage.latestAmazonLinux2023({
+          cpuType: ec2.AmazonLinuxCpuType.ARM_64,
+        }),
+        vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+        securityGroup: debugDbTunnelSg,
+        role: debugDbTunnelRole,
+        requireImdsv2: true,
+      });
+      cdk.Tags.of(debugDbTunnelInstance).add('Name', buildResourceName(envName, 'debug-db-tunnel'));
+
+      new cdk.CfnOutput(this, 'DebugDbTunnelInstanceId', {
+        value: debugDbTunnelInstance.instanceId,
+      });
+
+      new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+        value: this.auroraCluster.clusterEndpoint.hostname,
+      });
+
+      new cdk.CfnOutput(this, 'DebugDbTunnelCommand', {
+        value: cdk.Fn.join('', [
+          'aws ssm start-session --target ',
+          debugDbTunnelInstance.instanceId,
+          ' --document-name AWS-StartPortForwardingSessionToRemoteHost --parameters "host=',
+          this.auroraCluster.clusterEndpoint.hostname,
+          ',portNumber=3306,localPortNumber=13306"',
+        ]),
+      });
+    }
 
     // ────────────────────────────────────────────────
     // メディアアセット保存用 S3 バケット
@@ -191,27 +256,33 @@ export class DataStack extends cdk.Stack {
     });
 
     // ────────────────────────────────────────────────
-    // アプリコンテナイメージ用 ECR リポジトリ
+    // API コンテナイメージ用 ECR リポジトリ
     // stg/prod はタグを固定し、デプロイとロールバックの対象を明確化する
     // ────────────────────────────────────────────────
-    this.appRepository = new ecr.Repository(this, 'AppRepository', {
-      repositoryName: buildResourceName(envName, 'api-service').toLowerCase(),
-      imageScanOnPush: true,
-      imageTagMutability: envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
-      removalPolicy: dataRemovalPolicy,
-    });
-    // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
-    this.appRepository.addLifecycleRule({
-      tagStatus: ecr.TagStatus.TAGGED,
-      tagPatternList: ['*'],
-      maxImageAge: cdk.Duration.days(30),
-      description: 'Retain tagged images for 30 days',
-    });
-    this.appRepository.addLifecycleRule({
-      tagStatus: ecr.TagStatus.UNTAGGED,
-      maxImageAge: cdk.Duration.days(7),
-      description: 'Retain untagged images for 7 days',
-    });
+    const createApiRepository = (id: string, resource: string): ecr.Repository => {
+      const repository = new ecr.Repository(this, id, {
+        repositoryName: buildResourceName(envName, resource).toLowerCase(),
+        imageScanOnPush: true,
+        imageTagMutability: envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
+        removalPolicy: dataRemovalPolicy,
+      });
+      // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
+      repository.addLifecycleRule({
+        tagStatus: ecr.TagStatus.TAGGED,
+        tagPatternList: ['*'],
+        maxImageAge: cdk.Duration.days(30),
+        description: 'Retain tagged images for 30 days',
+      });
+      repository.addLifecycleRule({
+        tagStatus: ecr.TagStatus.UNTAGGED,
+        maxImageAge: cdk.Duration.days(7),
+        description: 'Retain untagged images for 7 days',
+      });
+      return repository;
+    };
+
+    this.appApiRepository = createApiRepository('AppApiRepository', 'app-api');
+    this.mgtApiRepository = createApiRepository('MgtApiRepository', 'mgt-api');
 
     // ────────────────────────────────────────────────
     // 行動ログ Delivery TSV 出力用 S3 バケット

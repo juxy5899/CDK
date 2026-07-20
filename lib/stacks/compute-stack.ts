@@ -15,12 +15,19 @@ export interface ComputeStackProps extends cdk.StackProps {
   envName: string;
   envConfig: EnvConfig;
   vpc: ec2.IVpc;
-  appRepository: ecr.Repository;
-  appImageTag: string;
+  appApiRepository: ecr.Repository;
+  mgtApiRepository: ecr.Repository;
+  appApiImageTag: string;
+  mgtApiImageTag: string;
   strictValidation: boolean;
   auroraSecret: secretsmanager.ISecret;
   auroraSecurityGroup: ec2.ISecurityGroup;
   eventQueue: sqs.IQueue;
+}
+
+interface ApiServiceRuntimeAccess {
+  database: boolean;
+  eventQueueSend: boolean;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -28,15 +35,19 @@ export class ComputeStack extends cdk.Stack {
   public readonly alb: elbv2.ApplicationLoadBalancer;
   /** ECS クラスター */
   public readonly cluster: ecs.Cluster;
-  /** Fargate タスク定義 */
-  public readonly taskDefinition: ecs.FargateTaskDefinition;
-  /** ECS Fargate サービス */
-  public readonly service: ecs.FargateService;
+  /** アプリ API Fargate タスク定義 */
+  public readonly appApiTaskDefinition?: ecs.FargateTaskDefinition;
+  /** 管理 API Fargate タスク定義 */
+  public readonly mgtApiTaskDefinition: ecs.FargateTaskDefinition;
+  /** アプリ API ECS Fargate サービス */
+  public readonly appApiService?: ecs.FargateService;
+  /** 管理 API ECS Fargate サービス */
+  public readonly mgtApiService: ecs.FargateService;
 
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, appRepository, appImageTag, strictValidation, auroraSecret, auroraSecurityGroup, eventQueue } = props;
+    const { envName, envConfig, vpc, appApiRepository, mgtApiRepository, appApiImageTag, mgtApiImageTag, strictValidation, auroraSecret, auroraSecurityGroup, eventQueue } = props;
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
@@ -44,7 +55,8 @@ export class ComputeStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
     const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
-    const hasAppImageTag = !isPlaceholder(appImageTag);
+    const hasAppApiImageTag = !isPlaceholder(appApiImageTag);
+    const hasMgtApiImageTag = !isPlaceholder(mgtApiImageTag);
     const allowDirectAlbAccess = envName === 'dev';
 
     if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
@@ -55,13 +67,13 @@ export class ComputeStack extends cdk.Stack {
       throw new Error(`${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`);
     }
 
-    if (strictValidation && envName !== 'dev' && !hasAppImageTag) {
-      throw new Error(`${envName} requires -c appImageTag=<immutable-image-tag> for ComputeStack deployment`);
+    if (strictValidation && envName !== 'dev' && (!hasAppApiImageTag || !hasMgtApiImageTag)) {
+      throw new Error(`${envName} requires -c appApiImageTag=<immutable-image-tag> and -c mgtApiImageTag=<immutable-image-tag> for ComputeStack deployment`);
     }
 
-    if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppImageTag)) {
+    if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppApiImageTag || !hasMgtApiImageTag)) {
       cdk.Annotations.of(this).addWarning(
-        'ComputeStack has placeholder deployment inputs. Use -c strictComputeValidation=true with certificateArn, originVerifyHeaderValue, and appImageTag before deploying Compute/Edge.',
+        'ComputeStack has placeholder deployment inputs. Use -c strictComputeValidation=true with certificateArn, originVerifyHeaderValue, appApiImageTag, and mgtApiImageTag before deploying Compute/Edge.',
       );
     }
 
@@ -125,112 +137,159 @@ export class ComputeStack extends cdk.Stack {
     });
     cdk.Tags.of(this.cluster).add('Name', buildResourceName(envName, 'cluster'));
 
-    // ────────────────────────────────────────────────
-    // Fargate タスク定義
-    // CPU・メモリは環境設定から取得
-    // ────────────────────────────────────────────────
-    this.taskDefinition = new ecs.FargateTaskDefinition(this, 'TaskDef', {
-      cpu: envConfig.taskCpu,
-      memoryLimitMiB: envConfig.taskMemoryMiB,
-    });
-
-    // API サービスコンテナを追加
-    const container = this.taskDefinition.addContainer('api-service', {
-      containerName: 'api-service',
-      image: ecs.ContainerImage.fromEcrRepository(appRepository, appImageTag),
-      logging: ecs.LogDrivers.awsLogs({
-        streamPrefix: buildResourceName(envName, 'api-service'),
-        logRetention: logs.RetentionDays.ONE_MONTH,
-      }),
-      environment: {
-        APP_ENV: envName,
-        EVENT_QUEUE_URL: eventQueue.queueUrl,
-        DB_SECRET_ARN: auroraSecret.secretArn,
-      },
-    });
-    auroraSecret.grantRead(this.taskDefinition.taskRole);
-
-    if (envConfig.enableXray) {
-      // X-Ray SDK がローカルデーモンへ UDP 送信するための接続先
-      container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
-
-      // X-Ray デーモンサイドカー
-      // アプリケーションのトレースを収集し、X-Ray サービスへ転送する
-      this.taskDefinition.addContainer('xray-daemon', {
-        containerName: 'xray-daemon',
-        image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
-        essential: false,
-        logging: ecs.LogDrivers.awsLogs({
-          streamPrefix: buildResourceName(envName, 'xray-daemon'),
-          logRetention: logs.RetentionDays.ONE_MONTH,
-        }),
-      }).addPortMappings({
-        containerPort: 2000,
-        protocol: ecs.Protocol.UDP,
+    const createTaskDefinition = (
+      id: string,
+      serviceName: string,
+      repository: ecr.Repository,
+      imageTag: string,
+      containerPort: number,
+      access: ApiServiceRuntimeAccess,
+    ): ecs.FargateTaskDefinition => {
+      const taskDefinition = new ecs.FargateTaskDefinition(this, id, {
+        cpu: envConfig.taskCpu,
+        memoryLimitMiB: envConfig.taskMemoryMiB,
       });
 
-      // タスクロールに X-Ray 送信権限を付与
-      this.taskDefinition.addToTaskRolePolicy(
-        new iam.PolicyStatement({
-          sid: 'XrayWriteAccess',
-          effect: iam.Effect.ALLOW,
-          actions: [
-            'xray:PutTraceSegments',
-            'xray:PutTelemetryRecords',
-            'xray:GetSamplingRules',
-            'xray:GetSamplingTargets',
-            'xray:GetSamplingStatisticSummaries',
-          ],
-          resources: ['*'],
+      const container = taskDefinition.addContainer(serviceName, {
+        containerName: serviceName,
+        image: ecs.ContainerImage.fromEcrRepository(repository, imageTag),
+        logging: ecs.LogDrivers.awsLogs({
+          streamPrefix: buildResourceName(envName, serviceName),
+          logRetention: logs.RetentionDays.ONE_MONTH,
         }),
-      );
-    }
+        environment: {
+          APP_ENV: envName,
+          SPRING_PROFILES_ACTIVE: envName,
+          ...(access.eventQueueSend ? { EVENT_QUEUE_URL: eventQueue.queueUrl } : {}),
+          ...(access.database ? { DB_SECRET_ARN: auroraSecret.secretArn } : {}),
+        },
+        secrets: access.database
+          ? {
+              host: ecs.Secret.fromSecretsManager(auroraSecret, 'host'),
+              port: ecs.Secret.fromSecretsManager(auroraSecret, 'port'),
+              dbname: ecs.Secret.fromSecretsManager(auroraSecret, 'dbname'),
+              username: ecs.Secret.fromSecretsManager(auroraSecret, 'username'),
+              password: ecs.Secret.fromSecretsManager(auroraSecret, 'password'),
+            }
+          : undefined,
+      });
+      container.addPortMappings({ containerPort });
+      if (access.database) {
+        auroraSecret.grantRead(taskDefinition.taskRole);
+      }
+      if (access.eventQueueSend) {
+        eventQueue.grantSendMessages(taskDefinition.taskRole);
+      }
 
-    eventQueue.grantSendMessages(this.taskDefinition.taskRole);
-    // コンテナポートマッピング（管理 API: 8080、アプリ API: 8081）
-    container.addPortMappings(
-      { containerPort: 8080 },
-      { containerPort: 8081 },
-    );
+      if (envConfig.enableXray) {
+        container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
+        taskDefinition.addContainer(`${serviceName}-xray-daemon`, {
+          containerName: `${serviceName}-xray-daemon`,
+          image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
+          essential: false,
+          logging: ecs.LogDrivers.awsLogs({
+            streamPrefix: buildResourceName(envName, `${serviceName}-xray-daemon`),
+            logRetention: logs.RetentionDays.ONE_MONTH,
+          }),
+        }).addPortMappings({
+          containerPort: 2000,
+          protocol: ecs.Protocol.UDP,
+        });
+        taskDefinition.addToTaskRolePolicy(
+          new iam.PolicyStatement({
+            sid: 'XrayWriteAccess',
+            effect: iam.Effect.ALLOW,
+            actions: [
+              'xray:PutTraceSegments',
+              'xray:PutTelemetryRecords',
+              'xray:GetSamplingRules',
+              'xray:GetSamplingTargets',
+              'xray:GetSamplingStatisticSummaries',
+            ],
+            resources: ['*'],
+          }),
+        );
+      }
+
+      return taskDefinition;
+    };
+
+    this.mgtApiTaskDefinition = createTaskDefinition('MgtApiTaskDef', 'mgt-api', mgtApiRepository, mgtApiImageTag, 8080, {
+      database: true,
+      eventQueueSend: true,
+    });
+    // app-api is temporarily excluded from ComputeStack deployment.
+    // this.appApiTaskDefinition = createTaskDefinition('AppApiTaskDef', 'app-api', appApiRepository, appApiImageTag, 8081, {
+    //   database: true,
+    //   eventQueueSend: false,
+    // });
 
     // ────────────────────────────────────────────────
     // ECS サービス用セキュリティグループ
     // ALB SG からの API ポートのみ許可
     // ────────────────────────────────────────────────
-    const serviceSg = new ec2.SecurityGroup(this, 'ServiceSg', {
+    const mgtApiServiceSg = new ec2.SecurityGroup(this, 'MgtApiServiceSg', {
       vpc,
-      description: 'Security group for ECS Fargate service',
+      description: 'Security group for mgt-api ECS Fargate service',
     });
-    // ALB から ECS Service への Ingress は listener.addTargets() によって自動追加される
+    mgtApiServiceSg.addIngressRule(albSg, ec2.Port.tcp(8080), 'Allow management API traffic from ALB');
 
-    new ec2.CfnSecurityGroupIngress(this, 'AuroraIngressFromService', {
+    // const appApiServiceSg = new ec2.SecurityGroup(this, 'AppApiServiceSg', {
+    //   vpc,
+    //   description: 'Security group for app-api ECS Fargate service',
+    // });
+    // appApiServiceSg.addIngressRule(albSg, ec2.Port.tcp(8081), 'Allow app API traffic from ALB');
+
+    new ec2.CfnSecurityGroupIngress(this, 'AuroraIngressFromMgtApiService', {
       groupId: auroraSecurityGroup.securityGroupId,
-      sourceSecurityGroupId: serviceSg.securityGroupId,
+      sourceSecurityGroupId: mgtApiServiceSg.securityGroupId,
       ipProtocol: 'tcp',
       fromPort: 3306,
       toPort: 3306,
-      description: 'Allow MySQL access from ECS Service',
+      description: 'Allow MySQL access from mgt-api ECS Service',
     });
+    // new ec2.CfnSecurityGroupIngress(this, 'AuroraIngressFromAppApiService', {
+    //   groupId: auroraSecurityGroup.securityGroupId,
+    //   sourceSecurityGroupId: appApiServiceSg.securityGroupId,
+    //   ipProtocol: 'tcp',
+    //   fromPort: 3306,
+    //   toPort: 3306,
+    //   description: 'Allow MySQL access from app-api ECS Service',
+    // });
 
     // ────────────────────────────────────────────────
     // ECS Fargate サービス
     // プライベートサブネット（PRIVATE_WITH_EGRESS）に配置
     // ────────────────────────────────────────────────
-    this.service = new ecs.FargateService(this, 'Service', {
+    this.mgtApiService = new ecs.FargateService(this, 'MgtApiService', {
       cluster: this.cluster,
-      taskDefinition: this.taskDefinition,
+      taskDefinition: this.mgtApiTaskDefinition,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      desiredCount: envConfig.minTaskCount,
+      desiredCount: envConfig.mgtApiMinTaskCount,
       assignPublicIp: false,
-      securityGroups: [serviceSg],
+      securityGroups: [mgtApiServiceSg],
       // stg/prod の 2 タスク高可用性を維持するため、ローリングデプロイ中も最小稼働数を保持する
-      minHealthyPercent: envConfig.minTaskCount >= 2 ? 100 : 50,
+      minHealthyPercent: envConfig.mgtApiMinTaskCount >= 2 ? 100 : 50,
       maxHealthyPercent: 200,
       healthCheckGracePeriod: cdk.Duration.seconds(90),
       // デプロイ失敗時に自動ロールバック
       circuitBreaker: { rollback: true },
     });
-    cdk.Tags.of(this.service).add('Name', buildResourceName(envName, 'service'));
+    cdk.Tags.of(this.mgtApiService).add('Name', buildResourceName(envName, 'mgt-api-service'));
+
+    // this.appApiService = new ecs.FargateService(this, 'AppApiService', {
+    //   cluster: this.cluster,
+    //   taskDefinition: this.appApiTaskDefinition,
+    //   vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+    //   desiredCount: envConfig.appApiMinTaskCount,
+    //   assignPublicIp: false,
+    //   securityGroups: [appApiServiceSg],
+    //   minHealthyPercent: envConfig.appApiMinTaskCount >= 2 ? 100 : 50,
+    //   maxHealthyPercent: 200,
+    //   healthCheckGracePeriod: cdk.Duration.seconds(90),
+    //   circuitBreaker: { rollback: true },
+    // });
+    // cdk.Tags.of(this.appApiService).add('Name', buildResourceName(envName, 'app-api-service'));
 
     const apiListenerConditions = (pathPattern: string): elbv2.ListenerCondition[] => {
       const conditions = [elbv2.ListenerCondition.pathPatterns([pathPattern])];
@@ -250,53 +309,56 @@ export class ComputeStack extends cdk.Stack {
       conditions: apiListenerConditions('/mgt-api/*'),
       port: 8080,
       protocol: elbv2.ApplicationProtocol.HTTP,
-      targets: [this.service],
+      targets: [this.mgtApiService],
       healthCheck: {
-        path: '/actuator/health',
+        path: '/mgt-api/actuator/health',
         port: '8080',
         protocol: elbv2.Protocol.HTTP,
       },
     };
 
-    const appApiTargetOptions: elbv2.AddApplicationTargetsProps = {
-      priority: 20,
-      conditions: apiListenerConditions('/app-api/*'),
-      port: 8081,
-      protocol: elbv2.ApplicationProtocol.HTTP,
-      targets: [this.service],
-      healthCheck: {
-        path: '/actuator/health',
-        port: '8081',
-        protocol: elbv2.Protocol.HTTP,
-      },
-    };
+    // const appApiTargetOptions: elbv2.AddApplicationTargetsProps = {
+    //   priority: 20,
+    //   conditions: apiListenerConditions('/app-api/*'),
+    //   port: 8081,
+    //   protocol: elbv2.ApplicationProtocol.HTTP,
+    //   targets: [this.appApiService],
+    //   healthCheck: {
+    //     path: '/app-api/actuator/health',
+    //     port: '8081',
+    //     protocol: elbv2.Protocol.HTTP,
+    //   },
+    // };
 
     // ALB ターゲットグループにサービスを登録
     listener.addTargets('MgtApiTarget', mgtApiTargetOptions);
-    listener.addTargets('AppApiTarget', appApiTargetOptions);
+    // listener.addTargets('AppApiTarget', appApiTargetOptions);
 
     // ────────────────────────────────────────────────
     // Application Auto Scaling
     // CPU・メモリ使用率に応じてタスク数をスケール
     // ────────────────────────────────────────────────
-    const scaling = this.service.autoScaleTaskCount({
-      minCapacity: envConfig.minTaskCount,
-      maxCapacity: envConfig.maxTaskCount,
-    });
+    const configureScaling = (idPrefix: string, service: ecs.FargateService, minTaskCount: number, maxTaskCount: number): void => {
+      const scaling = service.autoScaleTaskCount({
+        minCapacity: minTaskCount,
+        maxCapacity: maxTaskCount,
+      });
 
-    // CPU 使用率 70% でスケールアウト
-    scaling.scaleOnCpuUtilization('CpuScaleOut', {
-      targetUtilizationPercent: 70,
-      scaleOutCooldown: cdk.Duration.seconds(300),
-      scaleInCooldown: cdk.Duration.seconds(300),
-    });
+      scaling.scaleOnCpuUtilization(`${idPrefix}CpuScaleOut`, {
+        targetUtilizationPercent: 70,
+        scaleOutCooldown: cdk.Duration.seconds(300),
+        scaleInCooldown: cdk.Duration.seconds(300),
+      });
 
-    // メモリ使用率 80% でスケールアウト
-    scaling.scaleOnMemoryUtilization('MemScaleOut', {
-      targetUtilizationPercent: 80,
-      scaleOutCooldown: cdk.Duration.seconds(300),
-      scaleInCooldown: cdk.Duration.seconds(300),
-    });
+      scaling.scaleOnMemoryUtilization(`${idPrefix}MemScaleOut`, {
+        targetUtilizationPercent: 80,
+        scaleOutCooldown: cdk.Duration.seconds(300),
+        scaleInCooldown: cdk.Duration.seconds(300),
+      });
+    };
+
+    configureScaling('MgtApi', this.mgtApiService, envConfig.mgtApiMinTaskCount, envConfig.mgtApiMaxTaskCount);
+    // configureScaling('AppApi', this.appApiService, envConfig.appApiMinTaskCount, envConfig.appApiMaxTaskCount);
 
     new cdk.CfnOutput(this, 'AlbDnsName', {
       value: this.alb.loadBalancerDnsName,

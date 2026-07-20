@@ -82,7 +82,8 @@ export CDK_DEPLOY_ACCOUNT=123456789012
 | Interface VPC Endpoints | 無効 | 有効 | 有効 |
 | Aurora Multi-AZ | なし | あり | あり |
 | Fargate CPU/Memory | 256/512 MiB | 512/1024 MiB | 512/1024 MiB |
-| ECS 最小/最大タスク | 1/2 | 2/3 | 2/3 |
+| app-api ECS 最小/最大タスク | 1/2 | 2/3 | 2/3 |
+| mgt-api ECS 最小/最大タスク | 1/1 | 2/3 | 2/3 |
 | Backup 有効化 | 無効 | 有効 | 有効 |
 | Athena 有効化 | 有効 | 有効 | 有効 |
 | Inspector 有効化 | 無効 | 有効 | 有効 |
@@ -144,13 +145,14 @@ stg/prod の ComputeStack・EdgeStack をデプロイする場合は、以下の
 
 | context | 用途 | dev の扱い |
 | --- | --- | --- |
-| `appImageTag` | ECS が起動する ECR イメージタグ | 未指定時は `latest` |
+| `appApiImageTag` | app-api ECS Service が起動する ECR イメージタグ | 未指定時は `latest` |
+| `mgtApiImageTag` | mgt-api ECS Service が起動する ECR イメージタグ | 未指定時は `latest` |
 | `originVerifyHeaderValue` | CloudFront から ALB へ付与する Origin 検証ヘッダー値 | プレースホルダー値を使用 |
 | `strictComputeValidation` | stg/prod の Compute・Edge 入力値をデプロイ前に検証するフラグ | 指定不要 |
 
 ```bash
-npx cdk deploy MTI-stg-ComputeStack -c env=stg -c appImageTag=20260718-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
-npx cdk deploy MTI-stg-EdgeStack -c env=stg -c appImageTag=20260718-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
+npx cdk deploy MTI-stg-ComputeStack -c env=stg -c appApiImageTag=20260718-app-001 -c mgtApiImageTag=20260718-mgt-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
+npx cdk deploy MTI-stg-EdgeStack -c env=stg -c appApiImageTag=20260718-app-001 -c mgtApiImageTag=20260718-mgt-001 -c originVerifyHeaderValue=<origin-verify-value> -c strictComputeValidation=true
 ```
 
 ### 差分確認 (Diff)

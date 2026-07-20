@@ -28,8 +28,10 @@ const envConfig = originVerifyHeaderValue === undefined
       ...baseEnvConfig,
       cloudFrontOriginVerifyHeaderValue: originVerifyHeaderValue,
     };
-const appImageTag = (app.node.tryGetContext('appImageTag') as string | undefined)
-  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_APP_IMAGE_TAG');
+const appApiImageTag = (app.node.tryGetContext('appApiImageTag') as string | undefined)
+  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_APP_API_IMAGE_TAG');
+const mgtApiImageTag = (app.node.tryGetContext('mgtApiImageTag') as string | undefined)
+  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_MGT_API_IMAGE_TAG');
 const strictComputeValidation = app.node.tryGetContext('strictComputeValidation') === 'true';
 
 // 共通スタックプロパティ
@@ -109,8 +111,10 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   envName,
   envConfig,
   vpc: networkStack.vpc,
-  appRepository: dataStack.appRepository,
-  appImageTag,
+  appApiRepository: dataStack.appApiRepository,
+  mgtApiRepository: dataStack.mgtApiRepository,
+  appApiImageTag,
+  mgtApiImageTag,
   strictValidation: strictComputeValidation,
   auroraSecret: dataStack.auroraSecret,
   auroraSecurityGroup: dataStack.auroraSecurityGroup,

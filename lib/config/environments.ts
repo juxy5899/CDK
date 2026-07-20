@@ -17,8 +17,10 @@ export const environments: Record<string, EnvConfig> = {
     region: 'ap-northeast-1', // メインのデプロイリージョン
     taskCpu: 256, // ECS Fargate タスク CPU
     taskMemoryMiB: 512, // ECS Fargate タスクメモリ（MiB）
-    minTaskCount: 1, // ECS サービス最小タスク数
-    maxTaskCount: 2, // ECS サービス最大タスク数
+    appApiMinTaskCount: 1, // app-api ECS サービス最小タスク数
+    appApiMaxTaskCount: 2, // app-api ECS サービス最大タスク数
+    mgtApiMinTaskCount: 1, // mgt-api ECS サービス最小タスク数
+    mgtApiMaxTaskCount: 1, // mgt-api ECS サービス最大タスク数
     enableBackup: false, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     // dev 初回構築中は destroy で S3 / Aurora を削除する。有効データ投入後は true に変更してから運用する。
@@ -90,8 +92,10 @@ export const environments: Record<string, EnvConfig> = {
     region: 'ap-northeast-1', // メインのデプロイリージョン
     taskCpu: 512, // ECS Fargate タスク CPU
     taskMemoryMiB: 1024, // ECS Fargate タスクメモリ（MiB）
-    minTaskCount: 2, // ECS サービス最小タスク数
-    maxTaskCount: 3, // ECS サービス最大タスク数
+    appApiMinTaskCount: 2, // app-api ECS サービス最小タスク数
+    appApiMaxTaskCount: 3, // app-api ECS サービス最大タスク数
+    mgtApiMinTaskCount: 2, // mgt-api ECS サービス最小タスク数
+    mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
@@ -164,8 +168,10 @@ export const environments: Record<string, EnvConfig> = {
     region: 'ap-northeast-1', // メインのデプロイリージョン
     taskCpu: 512, // ECS Fargate タスク CPU
     taskMemoryMiB: 1024, // ECS Fargate タスクメモリ（MiB）
-    minTaskCount: 2, // ECS サービス最小タスク数
-    maxTaskCount: 3, // ECS サービス最大タスク数
+    appApiMinTaskCount: 2, // app-api ECS サービス最小タスク数
+    appApiMaxTaskCount: 3, // app-api ECS サービス最大タスク数
+    mgtApiMinTaskCount: 2, // mgt-api ECS サービス最小タスク数
+    mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する

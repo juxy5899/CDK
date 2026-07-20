@@ -30,11 +30,17 @@ export interface EnvConfig {
   /** Fargate タスクメモリ（MiB） */
   taskMemoryMiB: 512 | 1024 | 2048 | 3072 | 4096 | 8192 | 16384;
 
-  /** ECS 最小タスク数 */
-  minTaskCount: number;
+  /** app-api ECS 最小タスク数 */
+  appApiMinTaskCount: number;
 
-  /** ECS 最大タスク数 */
-  maxTaskCount: number;
+  /** app-api ECS 最大タスク数 */
+  appApiMaxTaskCount: number;
+
+  /** mgt-api ECS 最小タスク数 */
+  mgtApiMinTaskCount: number;
+
+  /** mgt-api ECS 最大タスク数 */
+  mgtApiMaxTaskCount: number;
 
   /** ドメイン名（未確定: 'PLACEHOLDER_DOMAIN_NAME'） */
   domainName: string;
