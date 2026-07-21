@@ -42,6 +42,12 @@ export interface EnvConfig {
   /** mgt-api ECS 最大タスク数 */
   mgtApiMaxTaskCount: number;
 
+  /** API ECR リポジトリのタグ付きイメージ保持数 */
+  apiTaggedImageRetentionCount: number;
+
+  /** API ECR リポジトリのタグなしイメージ保持日数 */
+  apiUntaggedImageRetentionDays: number;
+
   /** ドメイン名（未確定: 'PLACEHOLDER_DOMAIN_NAME'） */
   domainName: string;
 

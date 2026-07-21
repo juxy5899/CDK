@@ -290,17 +290,17 @@ export class DataStack extends cdk.Stack {
           envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
         removalPolicy: dataRemovalPolicy,
       });
-      // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
+      // タグ付きイメージはロールバック用に一定数保持し、タグなしイメージは短期で削除する
       repository.addLifecycleRule({
         tagStatus: ecr.TagStatus.TAGGED,
         tagPatternList: ['*'],
-        maxImageAge: cdk.Duration.days(30),
-        description: 'Retain tagged images for 30 days',
+        maxImageCount: envConfig.apiTaggedImageRetentionCount,
+        description: `Retain latest ${envConfig.apiTaggedImageRetentionCount} tagged images`,
       });
       repository.addLifecycleRule({
         tagStatus: ecr.TagStatus.UNTAGGED,
-        maxImageAge: cdk.Duration.days(7),
-        description: 'Retain untagged images for 7 days',
+        maxImageAge: cdk.Duration.days(envConfig.apiUntaggedImageRetentionDays),
+        description: `Retain untagged images for ${envConfig.apiUntaggedImageRetentionDays} days`,
       });
       return repository;
     };

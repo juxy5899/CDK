@@ -205,6 +205,7 @@ export class ComputeStack extends cdk.Stack {
             ? {
                 APP_MEDIA_S3_BUCKET: mediaBucket.bucketName,
                 APP_MEDIA_S3_UPLOAD_PREFIX: envConfig.videoUploadPrefix,
+                APP_MEDIA_S3_PUBLIC_PREFIX: envConfig.mediaOutputPrefix,
               }
             : {}),
           ...(access.actionLogRawBucket

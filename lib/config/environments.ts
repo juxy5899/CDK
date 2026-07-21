@@ -21,6 +21,8 @@ export const environments: Record<string, EnvConfig> = {
     appApiMaxTaskCount: 2, // app-api ECS サービス最大タスク数
     mgtApiMinTaskCount: 1, // mgt-api ECS サービス最小タスク数
     mgtApiMaxTaskCount: 1, // mgt-api ECS サービス最大タスク数
+    apiTaggedImageRetentionCount: 10, // API ECR タグ付きイメージ保持数
+    apiUntaggedImageRetentionDays: 7, // API ECR タグなしイメージ保持日数
     enableBackup: false, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     enableAccessLogs: false, // CloudFront / ALB アクセスログ有効化フラグ（dev は無効）
@@ -101,6 +103,8 @@ export const environments: Record<string, EnvConfig> = {
     appApiMaxTaskCount: 3, // app-api ECS サービス最大タスク数
     mgtApiMinTaskCount: 2, // mgt-api ECS サービス最小タスク数
     mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
+    apiTaggedImageRetentionCount: 20, // API ECR タグ付きイメージ保持数
+    apiUntaggedImageRetentionDays: 7, // API ECR タグなしイメージ保持日数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     enableAccessLogs: true, // CloudFront / ALB アクセスログ有効化フラグ
@@ -182,6 +186,8 @@ export const environments: Record<string, EnvConfig> = {
     appApiMaxTaskCount: 3, // app-api ECS サービス最大タスク数
     mgtApiMinTaskCount: 2, // mgt-api ECS サービス最小タスク数
     mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
+    apiTaggedImageRetentionCount: 20, // API ECR タグ付きイメージ保持数
+    apiUntaggedImageRetentionDays: 7, // API ECR タグなしイメージ保持日数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
     enableAccessLogs: true, // CloudFront / ALB アクセスログ有効化フラグ
