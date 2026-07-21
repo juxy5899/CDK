@@ -21,17 +21,21 @@ if (!baseEnvConfig) {
   throw new Error(`環境 "${envName}" の設定が見つかりません。有効な値: dev, stg, prod`);
 }
 
-const originVerifyHeaderValue = app.node.tryGetContext('originVerifyHeaderValue') as string | undefined;
-const envConfig = originVerifyHeaderValue === undefined
-  ? baseEnvConfig
-  : {
-      ...baseEnvConfig,
-      cloudFrontOriginVerifyHeaderValue: originVerifyHeaderValue,
-    };
-const appApiImageTag = (app.node.tryGetContext('appApiImageTag') as string | undefined)
-  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_APP_API_IMAGE_TAG');
-const mgtApiImageTag = (app.node.tryGetContext('mgtApiImageTag') as string | undefined)
-  ?? (envName === 'dev' ? 'latest' : 'PLACEHOLDER_MGT_API_IMAGE_TAG');
+const originVerifyHeaderValue = app.node.tryGetContext('originVerifyHeaderValue') as
+  string | undefined;
+const envConfig =
+  originVerifyHeaderValue === undefined
+    ? baseEnvConfig
+    : {
+        ...baseEnvConfig,
+        cloudFrontOriginVerifyHeaderValue: originVerifyHeaderValue,
+      };
+const appApiImageTag =
+  (app.node.tryGetContext('appApiImageTag') as string | undefined) ??
+  (envName === 'dev' ? 'latest' : 'PLACEHOLDER_APP_API_IMAGE_TAG');
+const mgtApiImageTag =
+  (app.node.tryGetContext('mgtApiImageTag') as string | undefined) ??
+  (envName === 'dev' ? 'latest' : 'PLACEHOLDER_MGT_API_IMAGE_TAG');
 const strictComputeValidation = app.node.tryGetContext('strictComputeValidation') === 'true';
 
 // 共通スタックプロパティ
@@ -113,6 +117,9 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   vpc: networkStack.vpc,
   appApiRepository: dataStack.appApiRepository,
   mgtApiRepository: dataStack.mgtApiRepository,
+  mediaBucket: dataStack.mediaBucket,
+  actionLogRawBucket: dataStack.actionLogRawBucket,
+  accessLogBucket: dataStack.accessLogBucket,
   appApiImageTag,
   mgtApiImageTag,
   strictValidation: strictComputeValidation,
@@ -141,4 +148,3 @@ const edgeStack = new EdgeStack(app, `MTI-${envName}-EdgeStack`, {
   terminationProtection: envName === 'prod',
 });
 edgeStack.addDependency(computeStack);
-

@@ -31,7 +31,9 @@ export class SecurityStack extends cdk.Stack {
       const externalId = envConfig.actionLogDeliveryExternalId;
 
       if (!customerAccountId || !externalId) {
-        throw new Error('actionLogDeliveryCustomerAccountId と actionLogDeliveryExternalId を設定してください');
+        throw new Error(
+          'actionLogDeliveryCustomerAccountId と actionLogDeliveryExternalId を設定してください',
+        );
       }
 
       const customerAccountPrincipal = isPlaceholder(customerAccountId)
@@ -45,7 +47,8 @@ export class SecurityStack extends cdk.Stack {
             'sts:ExternalId': externalId,
           },
         }),
-        description: 'Cross-account IAM role for retrieving action log delivery TSV files from the customer AWS account',
+        description:
+          'Cross-account IAM role for retrieving action log delivery TSV files from the customer AWS account',
       });
 
       this.actionLogDeliveryAccessRole.addToPolicy(

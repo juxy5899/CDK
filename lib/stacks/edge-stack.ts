@@ -111,11 +111,15 @@ export class EdgeStack extends cdk.Stack {
     const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
 
     if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
-      throw new Error(`${envName} requires certificateArn to enforce HTTPS_ONLY from CloudFront to ALB`);
+      throw new Error(
+        `${envName} requires certificateArn to enforce HTTPS_ONLY from CloudFront to ALB`,
+      );
     }
 
     if (strictValidation && envName !== 'dev' && !hasOriginVerifyHeader) {
-      throw new Error(`${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`);
+      throw new Error(
+        `${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`,
+      );
     }
 
     if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader)) {
@@ -146,6 +150,13 @@ export class EdgeStack extends cdk.Stack {
       'mgt-api/*': apiBehavior,
     };
 
+    const accessLogBucket = envConfig.enableAccessLogs
+      ? s3.Bucket.fromBucketAttributes(this, 'AccessLogBucket', {
+          bucketName: envConfig.accessLogBucketName,
+          bucketRegionalDomainName: `${envConfig.accessLogBucketName}.s3.${envConfig.region}.amazonaws.com`,
+        })
+      : undefined;
+
     const baseDistributionProps: cloudfront.DistributionProps = {
       defaultRootObject: envConfig.adminSiteDefaultRootObject,
       defaultBehavior: {
@@ -155,6 +166,13 @@ export class EdgeStack extends cdk.Stack {
       additionalBehaviors,
       comment: buildResourceName(envName, 'edge-distribution'),
       webAclId: this.webAclArn,
+      ...(envConfig.enableAccessLogs
+        ? {
+            enableLogging: true,
+            logBucket: accessLogBucket,
+            logFilePrefix: envConfig.cloudFrontAccessLogPrefix,
+          }
+        : {}),
     };
 
     const distributionProps: cloudfront.DistributionProps =
@@ -183,7 +201,12 @@ export class EdgeStack extends cdk.Stack {
     }
 
     // Route 53 はドメイン情報確定時のみ作成する
-    if (hasCustomDomain && hasEdgeCertificate && !isPlaceholder(envConfig.hostedZoneName) && !isPlaceholder(envConfig.hostedZoneId)) {
+    if (
+      hasCustomDomain &&
+      hasEdgeCertificate &&
+      !isPlaceholder(envConfig.hostedZoneName) &&
+      !isPlaceholder(envConfig.hostedZoneId)
+    ) {
       const hostedZone = route53.HostedZone.fromHostedZoneAttributes(this, 'HostedZone', {
         zoneName: envConfig.hostedZoneName,
         hostedZoneId: envConfig.hostedZoneId,

@@ -28,7 +28,8 @@ export class EventProcessingStack extends cdk.Stack {
       envConfig.eventBusName && envConfig.eventBusName.trim().length > 0
         ? { eventBusName: envConfig.eventBusName }
         : {};
-    const dlqRemovalPolicy = envName === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY;
+    const dlqRemovalPolicy =
+      envName === 'prod' ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY;
 
     this.eventBus = new events.EventBus(this, 'EventBus', eventBusProps);
 
@@ -114,6 +115,5 @@ export class EventProcessingStack extends cdk.Stack {
       evaluationPeriods: 1,
       datapointsToAlarm: 1,
     });
-
   }
 }

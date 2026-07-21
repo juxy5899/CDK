@@ -30,6 +30,8 @@ export class DataStack extends cdk.Stack {
   public readonly actionLogRawBucket: s3.Bucket;
   /** 行動ログ Athena 中間成果物保存用 S3 バケット */
   public readonly actionLogIntermediateBucket: s3.Bucket;
+  /** CloudFront / ALB アクセスログ保存用 S3 バケット */
+  public readonly accessLogBucket?: s3.Bucket;
   /** 外部システム向けログ配信用 S3 バケット */
   public readonly logDeliveryBucket: s3.Bucket;
   /** アプリ API コンテナイメージ用 ECR リポジトリ */
@@ -69,7 +71,9 @@ export class DataStack extends cdk.Stack {
     const dbInstanceClassPattern = /^db\.(.+)$/;
     const dbInstanceClassMatch = envConfig.dbInstanceClass.match(dbInstanceClassPattern);
     if (dbInstanceClassMatch === null) {
-      throw new Error(`dbInstanceClass must use the RDS format "db.<family>.<size>": ${envConfig.dbInstanceClass}`);
+      throw new Error(
+        `dbInstanceClass must use the RDS format "db.<family>.<size>": ${envConfig.dbInstanceClass}`,
+      );
     }
     const auroraInstanceType = new ec2.InstanceType(dbInstanceClassMatch[1]);
 
@@ -255,6 +259,25 @@ export class DataStack extends cdk.Stack {
       ],
     });
 
+    if (envConfig.enableAccessLogs) {
+      this.accessLogBucket = new s3.Bucket(this, 'AccessLogBucket', {
+        bucketName: envConfig.accessLogBucketName,
+        versioned: false,
+        encryption: s3.BucketEncryption.S3_MANAGED,
+        blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+        objectOwnership: s3.ObjectOwnership.OBJECT_WRITER,
+        enforceSSL: true,
+        removalPolicy: dataRemovalPolicy,
+        autoDeleteObjects: autoDeleteDataObjects,
+        lifecycleRules: [
+          {
+            expiration: cdk.Duration.days(envConfig.accessLogRetentionDays),
+            abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
+          },
+        ],
+      });
+    }
+
     // ────────────────────────────────────────────────
     // API コンテナイメージ用 ECR リポジトリ
     // stg/prod はタグを固定し、デプロイとロールバックの対象を明確化する
@@ -263,7 +286,8 @@ export class DataStack extends cdk.Stack {
       const repository = new ecr.Repository(this, id, {
         repositoryName: buildResourceName(envName, resource).toLowerCase(),
         imageScanOnPush: true,
-        imageTagMutability: envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
+        imageTagMutability:
+          envName === 'dev' ? ecr.TagMutability.MUTABLE : ecr.TagMutability.IMMUTABLE,
         removalPolicy: dataRemovalPolicy,
       });
       // タグ付きイメージはロールバック用に 30 日保持し、タグなしイメージは短期で削除する
@@ -384,7 +408,7 @@ export class DataStack extends cdk.Stack {
           tableType: 'EXTERNAL_TABLE',
           parameters: {
             EXTERNAL: 'TRUE',
-            'classification': 'json',
+            classification: 'json',
             'projection.enabled': 'true',
             'projection.year.type': 'integer',
             'projection.year.range': `${envConfig.actionLogProjectionStartYear},${envConfig.actionLogProjectionEndYear}`,

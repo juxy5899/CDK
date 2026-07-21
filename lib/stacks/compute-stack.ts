@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
@@ -17,6 +18,9 @@ export interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
   appApiRepository: ecr.Repository;
   mgtApiRepository: ecr.Repository;
+  mediaBucket: s3.IBucket;
+  actionLogRawBucket: s3.IBucket;
+  accessLogBucket?: s3.IBucket;
   appApiImageTag: string;
   mgtApiImageTag: string;
   strictValidation: boolean;
@@ -28,6 +32,8 @@ export interface ComputeStackProps extends cdk.StackProps {
 interface ApiServiceRuntimeAccess {
   database: boolean;
   eventQueueSend: boolean;
+  mediaBucket: boolean;
+  actionLogRawBucket: boolean;
 }
 
 export class ComputeStack extends cdk.Stack {
@@ -47,7 +53,22 @@ export class ComputeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ComputeStackProps) {
     super(scope, id, props);
 
-    const { envName, envConfig, vpc, appApiRepository, mgtApiRepository, appApiImageTag, mgtApiImageTag, strictValidation, auroraSecret, auroraSecurityGroup, eventQueue } = props;
+    const {
+      envName,
+      envConfig,
+      vpc,
+      appApiRepository,
+      mgtApiRepository,
+      mediaBucket,
+      actionLogRawBucket,
+      accessLogBucket,
+      appApiImageTag,
+      mgtApiImageTag,
+      strictValidation,
+      auroraSecret,
+      auroraSecurityGroup,
+      eventQueue,
+    } = props;
 
     // ────────────────────────────────────────────────
     // ALB セキュリティグループ
@@ -60,18 +81,27 @@ export class ComputeStack extends cdk.Stack {
     const allowDirectAlbAccess = envName === 'dev';
 
     if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
-      throw new Error(`${envName} requires certificateArn to enable HTTPS between CloudFront and ALB`);
+      throw new Error(
+        `${envName} requires certificateArn to enable HTTPS between CloudFront and ALB`,
+      );
     }
 
     if (strictValidation && envName !== 'dev' && !hasOriginVerifyHeader) {
-      throw new Error(`${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`);
+      throw new Error(
+        `${envName} requires cloudFrontOriginVerifyHeaderValue for ALB origin verification`,
+      );
     }
 
     if (strictValidation && envName !== 'dev' && (!hasAppApiImageTag || !hasMgtApiImageTag)) {
-      throw new Error(`${envName} requires -c appApiImageTag=<immutable-image-tag> and -c mgtApiImageTag=<immutable-image-tag> for ComputeStack deployment`);
+      throw new Error(
+        `${envName} requires -c appApiImageTag=<immutable-image-tag> and -c mgtApiImageTag=<immutable-image-tag> for ComputeStack deployment`,
+      );
     }
 
-    if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppApiImageTag || !hasMgtApiImageTag)) {
+    if (
+      envName !== 'dev' &&
+      (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppApiImageTag || !hasMgtApiImageTag)
+    ) {
       cdk.Annotations.of(this).addWarning(
         'ComputeStack has placeholder deployment inputs. Use -c strictComputeValidation=true with certificateArn, originVerifyHeaderValue, appApiImageTag, and mgtApiImageTag before deploying Compute/Edge.',
       );
@@ -103,6 +133,12 @@ export class ComputeStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: albSg,
     });
+    if (envConfig.enableAccessLogs) {
+      if (accessLogBucket === undefined) {
+        throw new Error('accessLogBucket is required when enableAccessLogs=true');
+      }
+      this.alb.logAccessLogs(accessLogBucket, envConfig.albAccessLogPrefix);
+    }
 
     // ALB リスナー
     // ACM 証明書が設定済みの場合は HTTPS (443)、未設定の場合は HTTP (80) で待ち受ける
@@ -160,8 +196,23 @@ export class ComputeStack extends cdk.Stack {
         environment: {
           APP_ENV: envName,
           SPRING_PROFILES_ACTIVE: envName,
+          ...(access.mediaBucket || access.actionLogRawBucket
+            ? { APP_AWS_REGION: this.region }
+            : {}),
           ...(access.eventQueueSend ? { EVENT_QUEUE_URL: eventQueue.queueUrl } : {}),
           ...(access.database ? { DB_SECRET_ARN: auroraSecret.secretArn } : {}),
+          ...(access.mediaBucket
+            ? {
+                APP_MEDIA_S3_BUCKET: mediaBucket.bucketName,
+                APP_MEDIA_S3_UPLOAD_PREFIX: envConfig.videoUploadPrefix,
+              }
+            : {}),
+          ...(access.actionLogRawBucket
+            ? {
+                APP_ACTION_LOG_RAW_S3_BUCKET: actionLogRawBucket.bucketName,
+                APP_ACTION_LOG_RAW_S3_PREFIX: envConfig.actionLogRawPrefix,
+              }
+            : {}),
         },
         secrets: access.database
           ? {
@@ -180,21 +231,43 @@ export class ComputeStack extends cdk.Stack {
       if (access.eventQueueSend) {
         eventQueue.grantSendMessages(taskDefinition.taskRole);
       }
+      if (access.mediaBucket) {
+        taskDefinition.addToTaskRolePolicy(
+          new iam.PolicyStatement({
+            sid: 'MediaBucketObjectAccess',
+            effect: iam.Effect.ALLOW,
+            actions: ['s3:GetObject', 's3:PutObject'],
+            resources: [mediaBucket.arnForObjects('*')],
+          }),
+        );
+      }
+      if (access.actionLogRawBucket) {
+        taskDefinition.addToTaskRolePolicy(
+          new iam.PolicyStatement({
+            sid: 'ActionLogRawBucketWriteAccess',
+            effect: iam.Effect.ALLOW,
+            actions: ['s3:PutObject'],
+            resources: [actionLogRawBucket.arnForObjects(`${envConfig.actionLogRawPrefix}*`)],
+          }),
+        );
+      }
 
       if (envConfig.enableXray) {
         container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
-        taskDefinition.addContainer(`${serviceName}-xray-daemon`, {
-          containerName: `${serviceName}-xray-daemon`,
-          image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
-          essential: false,
-          logging: ecs.LogDrivers.awsLogs({
-            streamPrefix: buildResourceName(envName, `${serviceName}-xray-daemon`),
-            logRetention: logs.RetentionDays.ONE_MONTH,
-          }),
-        }).addPortMappings({
-          containerPort: 2000,
-          protocol: ecs.Protocol.UDP,
-        });
+        taskDefinition
+          .addContainer(`${serviceName}-xray-daemon`, {
+            containerName: `${serviceName}-xray-daemon`,
+            image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
+            essential: false,
+            logging: ecs.LogDrivers.awsLogs({
+              streamPrefix: buildResourceName(envName, `${serviceName}-xray-daemon`),
+              logRetention: logs.RetentionDays.ONE_MONTH,
+            }),
+          })
+          .addPortMappings({
+            containerPort: 2000,
+            protocol: ecs.Protocol.UDP,
+          });
         taskDefinition.addToTaskRolePolicy(
           new iam.PolicyStatement({
             sid: 'XrayWriteAccess',
@@ -214,14 +287,25 @@ export class ComputeStack extends cdk.Stack {
       return taskDefinition;
     };
 
-    this.mgtApiTaskDefinition = createTaskDefinition('MgtApiTaskDef', 'mgt-api', mgtApiRepository, mgtApiImageTag, 8080, {
-      database: true,
-      eventQueueSend: true,
-    });
+    this.mgtApiTaskDefinition = createTaskDefinition(
+      'MgtApiTaskDef',
+      'mgt-api',
+      mgtApiRepository,
+      mgtApiImageTag,
+      8080,
+      {
+        database: true,
+        eventQueueSend: true,
+        mediaBucket: true,
+        actionLogRawBucket: true,
+      },
+    );
     // app-api is temporarily excluded from ComputeStack deployment.
     // this.appApiTaskDefinition = createTaskDefinition('AppApiTaskDef', 'app-api', appApiRepository, appApiImageTag, 8081, {
     //   database: true,
     //   eventQueueSend: false,
+    //   mediaBucket: false,
+    //   actionLogRawBucket: false,
     // });
 
     // ────────────────────────────────────────────────
@@ -232,7 +316,11 @@ export class ComputeStack extends cdk.Stack {
       vpc,
       description: 'Security group for mgt-api ECS Fargate service',
     });
-    mgtApiServiceSg.addIngressRule(albSg, ec2.Port.tcp(8080), 'Allow management API traffic from ALB');
+    mgtApiServiceSg.addIngressRule(
+      albSg,
+      ec2.Port.tcp(8080),
+      'Allow management API traffic from ALB',
+    );
 
     // const appApiServiceSg = new ec2.SecurityGroup(this, 'AppApiServiceSg', {
     //   vpc,
@@ -295,10 +383,9 @@ export class ComputeStack extends cdk.Stack {
       const conditions = [elbv2.ListenerCondition.pathPatterns([pathPattern])];
       if (!allowDirectAlbAccess) {
         conditions.push(
-          elbv2.ListenerCondition.httpHeader(
-            envConfig.cloudFrontOriginVerifyHeaderName,
-            [envConfig.cloudFrontOriginVerifyHeaderValue],
-          ),
+          elbv2.ListenerCondition.httpHeader(envConfig.cloudFrontOriginVerifyHeaderName, [
+            envConfig.cloudFrontOriginVerifyHeaderValue,
+          ]),
         );
       }
       return conditions;
@@ -338,7 +425,12 @@ export class ComputeStack extends cdk.Stack {
     // Application Auto Scaling
     // CPU・メモリ使用率に応じてタスク数をスケール
     // ────────────────────────────────────────────────
-    const configureScaling = (idPrefix: string, service: ecs.FargateService, minTaskCount: number, maxTaskCount: number): void => {
+    const configureScaling = (
+      idPrefix: string,
+      service: ecs.FargateService,
+      minTaskCount: number,
+      maxTaskCount: number,
+    ): void => {
       const scaling = service.autoScaleTaskCount({
         minCapacity: minTaskCount,
         maxCapacity: maxTaskCount,
@@ -357,7 +449,12 @@ export class ComputeStack extends cdk.Stack {
       });
     };
 
-    configureScaling('MgtApi', this.mgtApiService, envConfig.mgtApiMinTaskCount, envConfig.mgtApiMaxTaskCount);
+    configureScaling(
+      'MgtApi',
+      this.mgtApiService,
+      envConfig.mgtApiMinTaskCount,
+      envConfig.mgtApiMaxTaskCount,
+    );
     // configureScaling('AppApi', this.appApiService, envConfig.appApiMinTaskCount, envConfig.appApiMaxTaskCount);
 
     new cdk.CfnOutput(this, 'AlbDnsName', {
@@ -370,6 +467,5 @@ export class ComputeStack extends cdk.Stack {
         value: 'Set certificateArn in environments.ts to enable HTTPS (443) on ALB origin',
       });
     }
-
   }
 }

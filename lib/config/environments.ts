@@ -23,6 +23,7 @@ export const environments: Record<string, EnvConfig> = {
     mgtApiMaxTaskCount: 1, // mgt-api ECS サービス最大タスク数
     enableBackup: false, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    enableAccessLogs: false, // CloudFront / ALB アクセスログ有効化フラグ（dev は無効）
     // dev 初回構築中は destroy で S3 / Aurora を削除する。有効データ投入後は true に変更してから運用する。
     retainDataResources: false,
     enableInspector: false, // Inspector（脆弱性スキャン）有効化フラグ
@@ -30,6 +31,10 @@ export const environments: Record<string, EnvConfig> = {
     enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-dev', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-dev', // Athena クエリ結果出力用 S3 バケット名
+    accessLogBucketName: 'asahimyapp-access-logs-dev', // CloudFront / ALB アクセスログ保存用 S3 バケット名
+    cloudFrontAccessLogPrefix: 'cloudfront/', // CloudFront アクセスログ保存用 S3 プレフィックス
+    albAccessLogPrefix: 'alb/', // ALB アクセスログ保存用 S3 プレフィックス
+    accessLogRetentionDays: 90, // CloudFront / ALB アクセスログ保持日数
     actionLogRawBucketName: 'asahimyapp-action-log-raw-dev', // 行動ログ Raw バケット名
     actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
     actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年
@@ -98,12 +103,17 @@ export const environments: Record<string, EnvConfig> = {
     mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    enableAccessLogs: true, // CloudFront / ALB アクセスログ有効化フラグ
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-stg', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-stg', // Athena クエリ結果出力用 S3 バケット名
+    accessLogBucketName: 'asahimyapp-access-logs-stg', // CloudFront / ALB アクセスログ保存用 S3 バケット名
+    cloudFrontAccessLogPrefix: 'cloudfront/', // CloudFront アクセスログ保存用 S3 プレフィックス
+    albAccessLogPrefix: 'alb/', // ALB アクセスログ保存用 S3 プレフィックス
+    accessLogRetentionDays: 365, // CloudFront / ALB アクセスログ保持日数
     actionLogRawBucketName: 'asahimyapp-action-log-raw-stg', // 行動ログ Raw バケット名（外部表 location）
     actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
     actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年
@@ -174,12 +184,17 @@ export const environments: Record<string, EnvConfig> = {
     mgtApiMaxTaskCount: 3, // mgt-api ECS サービス最大タスク数
     enableBackup: true, // AWS Backup 有効化フラグ
     enableAthena: true, // Athena（ログ分析基盤）有効化フラグ
+    enableAccessLogs: true, // CloudFront / ALB アクセスログ有効化フラグ
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-prod', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-prod', // Athena クエリ結果出力用 S3 バケット名
+    accessLogBucketName: 'asahimyapp-access-logs-prod', // CloudFront / ALB アクセスログ保存用 S3 バケット名
+    cloudFrontAccessLogPrefix: 'cloudfront/', // CloudFront アクセスログ保存用 S3 プレフィックス
+    albAccessLogPrefix: 'alb/', // ALB アクセスログ保存用 S3 プレフィックス
+    accessLogRetentionDays: 365, // CloudFront / ALB アクセスログ保持日数
     actionLogRawBucketName: 'asahimyapp-action-log-raw-prod', // 行動ログ Raw バケット名（外部表 location）
     actionLogRawPrefix: 'raw/action-log/', // 行動ログ Raw プレフィックス
     actionLogProjectionStartYear: 2026, // 行動ログ Athena Partition Projection 開始年

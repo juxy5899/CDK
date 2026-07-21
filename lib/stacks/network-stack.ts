@@ -53,41 +53,56 @@ export class NetworkStack extends cdk.Stack {
     // 東京環境固定（dev/stg）、将来 DR（大阪）対応時は environment から AZ リストを取得
     // ============================================================
     const azConfigs = [
-      { id: '1a', az: 'ap-northeast-1a', pub: '10.0.1.0/24', priv: '10.0.11.0/24', db: '10.0.21.0/24' },
-      { id: '1c', az: 'ap-northeast-1c', pub: '10.0.2.0/24', priv: '10.0.12.0/24', db: '10.0.22.0/24' },
+      {
+        id: '1a',
+        az: 'ap-northeast-1a',
+        pub: '10.0.1.0/24',
+        priv: '10.0.11.0/24',
+        db: '10.0.21.0/24',
+      },
+      {
+        id: '1c',
+        az: 'ap-northeast-1c',
+        pub: '10.0.2.0/24',
+        priv: '10.0.12.0/24',
+        db: '10.0.22.0/24',
+      },
     ];
 
-    const selectedAzs = azConfigs.map(c => c.az);
+    const selectedAzs = azConfigs.map((c) => c.az);
 
     // ============================================================
     // 各層のサブネット批量作成（2 AZ）
     // ============================================================
-    const publicSubnets = azConfigs.map(c =>
-      new ec2.CfnSubnet(this, `PublicSubnet${c.id}`, {
-        vpcId: cfnVpc.ref,
-        cidrBlock: c.pub,
-        availabilityZone: c.az,
-        mapPublicIpOnLaunch: true,
-        tags: [{ key: 'Name', value: buildResourceName(envName, `public-subnet-${c.id}`) }],
-      }),
+    const publicSubnets = azConfigs.map(
+      (c) =>
+        new ec2.CfnSubnet(this, `PublicSubnet${c.id}`, {
+          vpcId: cfnVpc.ref,
+          cidrBlock: c.pub,
+          availabilityZone: c.az,
+          mapPublicIpOnLaunch: true,
+          tags: [{ key: 'Name', value: buildResourceName(envName, `public-subnet-${c.id}`) }],
+        }),
     );
 
-    const privateSubnets = azConfigs.map(c =>
-      new ec2.CfnSubnet(this, `PrivateSubnet${c.id}`, {
-        vpcId: cfnVpc.ref,
-        cidrBlock: c.priv,
-        availabilityZone: c.az,
-        tags: [{ key: 'Name', value: buildResourceName(envName, `private-subnet-${c.id}`) }],
-      }),
+    const privateSubnets = azConfigs.map(
+      (c) =>
+        new ec2.CfnSubnet(this, `PrivateSubnet${c.id}`, {
+          vpcId: cfnVpc.ref,
+          cidrBlock: c.priv,
+          availabilityZone: c.az,
+          tags: [{ key: 'Name', value: buildResourceName(envName, `private-subnet-${c.id}`) }],
+        }),
     );
 
-    const dbSubnets = azConfigs.map(c =>
-      new ec2.CfnSubnet(this, `DbSubnet${c.id}`, {
-        vpcId: cfnVpc.ref,
-        cidrBlock: c.db,
-        availabilityZone: c.az,
-        tags: [{ key: 'Name', value: buildResourceName(envName, `db-subnet-${c.id}`) }],
-      }),
+    const dbSubnets = azConfigs.map(
+      (c) =>
+        new ec2.CfnSubnet(this, `DbSubnet${c.id}`, {
+          vpcId: cfnVpc.ref,
+          cidrBlock: c.db,
+          availabilityZone: c.az,
+          tags: [{ key: 'Name', value: buildResourceName(envName, `db-subnet-${c.id}`) }],
+        }),
     );
 
     // ============================================================
@@ -219,9 +234,9 @@ export class NetworkStack extends cdk.Stack {
     // パブリックプロパティへの代入
     // ============================================================
     this.vpcId = cfnVpc.ref;
-    this.publicSubnetIds = publicSubnets.map(s => s.ref);
-    this.privateSubnetIds = privateSubnets.map(s => s.ref);
-    this.dbSubnetIds = dbSubnets.map(s => s.ref);
+    this.publicSubnetIds = publicSubnets.map((s) => s.ref);
+    this.privateSubnetIds = privateSubnets.map((s) => s.ref);
+    this.dbSubnetIds = dbSubnets.map((s) => s.ref);
 
     // ============================================================
     // L2 VPC オブジェクト生成（fromVpcAttributes を使用）
@@ -247,11 +262,7 @@ export class NetworkStack extends cdk.Stack {
       // S3 ゲートウェイエンドポイント（追加コストなし）
       // 全ルートテーブルにルートを追加する
       // ──────────────────────────────────────────
-      const allRouteTableIds = [
-        publicRouteTable.ref,
-        privateRouteTable.ref,
-        dbRouteTable.ref,
-      ];
+      const allRouteTableIds = [publicRouteTable.ref, privateRouteTable.ref, dbRouteTable.ref];
 
       new ec2.CfnVPCEndpoint(this, 'S3GatewayEndpoint', {
         vpcId: cfnVpc.ref,

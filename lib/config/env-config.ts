@@ -65,6 +65,10 @@ export interface EnvConfig {
 
   /** Amazon Athena 有効化 */
   enableAthena: boolean;
+
+  /** CloudFront / ALB アクセスログ有効化 */
+  enableAccessLogs: boolean;
+
   /** データリソースを Stack 削除後も保持するか */
   retainDataResources: boolean;
 
@@ -73,6 +77,18 @@ export interface EnvConfig {
 
   /** Athena クエリ結果出力用 S3 バケット名 */
   athenaResultsBucketName: string;
+
+  /** CloudFront / ALB アクセスログ保存用 S3 バケット名 */
+  accessLogBucketName: string;
+
+  /** CloudFront アクセスログ保存用 S3 プレフィックス */
+  cloudFrontAccessLogPrefix: string;
+
+  /** ALB アクセスログ保存用 S3 プレフィックス */
+  albAccessLogPrefix: string;
+
+  /** CloudFront / ALB アクセスログ保持日数 */
+  accessLogRetentionDays: number;
 
   /** 行動ログ Raw データ保存用 S3 バケット名 */
   actionLogRawBucketName: string;
