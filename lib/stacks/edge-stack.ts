@@ -157,11 +157,35 @@ export class EdgeStack extends cdk.Stack {
         })
       : undefined;
 
+    const adminSiteSpaRewriteFunction = new cloudfront.Function(
+      this,
+      'AdminSiteSpaRewriteFunction',
+      {
+        code: cloudfront.FunctionCode.fromInline(`function handler(event) {
+          var request = event.request;
+          var uri = request.uri;
+          var lastSegment = uri.substring(uri.lastIndexOf('/') + 1);
+
+          if (uri !== '/' && lastSegment.indexOf('.') === -1) {
+            request.uri = '/${envConfig.adminSiteDefaultRootObject}';
+          }
+
+          return request;
+        }`),
+      },
+    );
+
     const baseDistributionProps: cloudfront.DistributionProps = {
       defaultRootObject: envConfig.adminSiteDefaultRootObject,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(this.adminSiteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        functionAssociations: [
+          {
+            function: adminSiteSpaRewriteFunction,
+            eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+          },
+        ],
       },
       additionalBehaviors,
       comment: buildResourceName(envName, 'edge-distribution'),

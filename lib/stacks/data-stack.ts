@@ -43,9 +43,11 @@ export class DataStack extends cdk.Stack {
     super(scope, id, props);
 
     const { envName, envConfig, vpc } = props;
-    const mediaUploadAllowedOrigins = isPlaceholder(envConfig.edgeDomainName)
-      ? undefined
-      : [`https://${envConfig.edgeDomainName}`];
+    const mediaUploadAllowedOrigins = envConfig.mediaUploadAllowedOrigins?.length
+      ? envConfig.mediaUploadAllowedOrigins
+      : isPlaceholder(envConfig.edgeDomainName)
+        ? undefined
+        : [`https://${envConfig.edgeDomainName}`];
     // prod は設定値にかかわらずデータリソースを保持する。
     // retainDataResources=false は dev 初回構築向け。有効データ投入後は true に変更してから destroy する。
     const shouldRetainDataResources = envName === 'prod' || envConfig.retainDataResources;

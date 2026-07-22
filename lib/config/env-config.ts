@@ -81,6 +81,9 @@ export interface EnvConfig {
   /** メディアアセット格納用 S3 バケット名 */
   mediaBucketName: string;
 
+  /** 管理画面からメディアアップロードを許可する Origin */
+  mediaUploadAllowedOrigins?: string[];
+
   /** Athena クエリ結果出力用 S3 バケット名 */
   athenaResultsBucketName: string;
 

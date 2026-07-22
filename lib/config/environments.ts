@@ -32,6 +32,11 @@ export const environments: Record<string, EnvConfig> = {
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
     enableEventProcessing: false, // EventBridge ルール有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-dev', // メディアアセット格納用 S3 バケット名
+    mediaUploadAllowedOrigins: [
+      'https://d18m41fslxip8d.cloudfront.net',
+      'http://localhost:3000',
+      'http://localhost:5173',
+    ], // 管理画面からメディアアップロードを許可する Origin
     athenaResultsBucketName: 'asahimyapp-athena-results-dev', // Athena クエリ結果出力用 S3 バケット名
     accessLogBucketName: 'asahimyapp-access-logs-dev', // CloudFront / ALB アクセスログ保存用 S3 バケット名
     cloudFrontAccessLogPrefix: 'cloudfront/', // CloudFront アクセスログ保存用 S3 プレフィックス

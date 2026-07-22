@@ -169,6 +169,7 @@ export class ComputeStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     this.cluster = new ecs.Cluster(this, 'Cluster', {
       vpc,
+      clusterName: buildResourceName(envName, 'cluster'),
       containerInsightsV2: ecs.ContainerInsights.ENHANCED,
     });
     cdk.Tags.of(this.cluster).add('Name', buildResourceName(envName, 'cluster'));
@@ -185,13 +186,18 @@ export class ComputeStack extends cdk.Stack {
         cpu: envConfig.taskCpu,
         memoryLimitMiB: envConfig.taskMemoryMiB,
       });
+      const serviceLogGroup = new logs.LogGroup(this, `${id}LogGroup`, {
+        logGroupName: `/aws/ecs/${buildResourceName(envName, serviceName)}`,
+        retention: logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.RETAIN,
+      });
 
       const container = taskDefinition.addContainer(serviceName, {
         containerName: serviceName,
         image: ecs.ContainerImage.fromEcrRepository(repository, imageTag),
         logging: ecs.LogDrivers.awsLogs({
+          logGroup: serviceLogGroup,
           streamPrefix: buildResourceName(envName, serviceName),
-          logRetention: logs.RetentionDays.ONE_MONTH,
         }),
         environment: {
           APP_ENV: envName,
@@ -200,7 +206,6 @@ export class ComputeStack extends cdk.Stack {
             ? { APP_AWS_REGION: this.region }
             : {}),
           ...(access.eventQueueSend ? { EVENT_QUEUE_URL: eventQueue.queueUrl } : {}),
-          ...(access.database ? { DB_SECRET_ARN: auroraSecret.secretArn } : {}),
           ...(access.mediaBucket
             ? {
                 APP_MEDIA_S3_BUCKET: mediaBucket.bucketName,
@@ -217,18 +222,15 @@ export class ComputeStack extends cdk.Stack {
         },
         secrets: access.database
           ? {
-              host: ecs.Secret.fromSecretsManager(auroraSecret, 'host'),
-              port: ecs.Secret.fromSecretsManager(auroraSecret, 'port'),
-              dbname: ecs.Secret.fromSecretsManager(auroraSecret, 'dbname'),
-              username: ecs.Secret.fromSecretsManager(auroraSecret, 'username'),
-              password: ecs.Secret.fromSecretsManager(auroraSecret, 'password'),
+              DB_HOST: ecs.Secret.fromSecretsManager(auroraSecret, 'host'),
+              DB_PORT: ecs.Secret.fromSecretsManager(auroraSecret, 'port'),
+              DB_NAME: ecs.Secret.fromSecretsManager(auroraSecret, 'dbname'),
+              DB_USERNAME: ecs.Secret.fromSecretsManager(auroraSecret, 'username'),
+              DB_PASSWORD: ecs.Secret.fromSecretsManager(auroraSecret, 'password'),
             }
           : undefined,
       });
       container.addPortMappings({ containerPort });
-      if (access.database) {
-        auroraSecret.grantRead(taskDefinition.taskRole);
-      }
       if (access.eventQueueSend) {
         eventQueue.grantSendMessages(taskDefinition.taskRole);
       }
@@ -255,14 +257,19 @@ export class ComputeStack extends cdk.Stack {
 
       if (envConfig.enableXray) {
         container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
+        const xrayLogGroup = new logs.LogGroup(this, `${id}XrayDaemonLogGroup`, {
+          logGroupName: `/aws/ecs/${buildResourceName(envName, `${serviceName}-xray-daemon`)}`,
+          retention: logs.RetentionDays.ONE_MONTH,
+          removalPolicy: cdk.RemovalPolicy.RETAIN,
+        });
         taskDefinition
           .addContainer(`${serviceName}-xray-daemon`, {
             containerName: `${serviceName}-xray-daemon`,
             image: ecs.ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.3.11'),
             essential: false,
             logging: ecs.LogDrivers.awsLogs({
+              logGroup: xrayLogGroup,
               streamPrefix: buildResourceName(envName, `${serviceName}-xray-daemon`),
-              logRetention: logs.RetentionDays.ONE_MONTH,
             }),
           })
           .addPortMappings({
@@ -352,6 +359,7 @@ export class ComputeStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     this.mgtApiService = new ecs.FargateService(this, 'MgtApiService', {
       cluster: this.cluster,
+      serviceName: buildResourceName(envName, 'mgt-api-service'),
       taskDefinition: this.mgtApiTaskDefinition,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       desiredCount: envConfig.mgtApiMinTaskCount,
