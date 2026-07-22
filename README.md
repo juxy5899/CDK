@@ -18,14 +18,11 @@ NetworkStack  ←─────────────────────
     ├── DataStack        Aurora MySQL / S3 / ECR
     │   （SecurityStack にも依存）
     │
-    ├── EventProcessingStack  EventBridge / SQS / CloudWatch Alarm
+    ├── MediaProcessingStack  Media SQS / DLQ / EventBridge Rule / MediaEventProcessor Lambda
     │   （DataStack にも依存）
     │
-    ├── BusinessLambdaStack   EventProcessor Lambda / 業務 Lambda 配置用スタック
-    │   （DataStack + EventProcessingStack にも依存）
-    │
     ├── ComputeStack     ALB / ECS Fargate / Auto Scaling
-    │   （DataStack + EventProcessingStack にも依存）
+    │   （DataStack + MediaProcessingStack にも依存）
 
 EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト S3 / Route 53・ACM 連携
     （ComputeStack に依存、ALB オリジン設定を参照）
@@ -33,24 +30,22 @@ EdgeStack (us-east-1)  CloudFront / CloudFront WAF / 管理画面静的サイト
 
 ### 各スタックのリソース
 
-| スタック              | 主なリソース                                                                                                    |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- |
-| NetworkStack          | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints              |
-| DataStack             | Aurora MySQL 3.04 (環境別インスタンスクラス)、media S3、ECR、AWS Backup、Athena Workgroup                       |
-| SecurityStack         | クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector                                        |
-| ComputeStack          | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar                             |
-| EventProcessingStack  | EventBridge カスタムバス、BusinessEvent ルール、MediaConvert ステータスルール、SQS メイン/DLQ、失敗監視アラーム |
-| BusinessLambdaStack   | EventProcessor Lambda、Lambda EventSource、業務 IAM 権限、Lambda 個別の VPC 接続、Lambda 失敗監視アラーム       |
-| EdgeStack (us-east-1) | 管理画面静的サイト S3、CloudFront Distribution、WAFv2 (CLOUDFRONT)、Route 53 Alias、ACM 証明書連携              |
+| スタック              | 主なリソース                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| NetworkStack          | VPC (10.0.0.0/16)、6サブネット (Public/Private/DB × 2AZ)、IGW、NAT GW、固定 NAT EIP、VPC Endpoints      |
+| DataStack             | Aurora MySQL 3.04 (環境別インスタンスクラス)、media S3、ECR、AWS Backup、Athena Workgroup               |
+| SecurityStack         | クロスアカウント IAM Role、CloudTrail、GuardDuty、SecurityHub、Inspector                                |
+| ComputeStack          | ALB (Public)、ECS Fargate (Private)、Application Auto Scaling、X-Ray Daemon Sidecar                     |
+| MediaProcessingStack  | Media SQS/DLQ、Media upload ルール、MediaConvert ステータスルール、MediaEventProcessor Lambda、処理監視 |
+| EdgeStack (us-east-1) | 管理画面静的サイト S3、CloudFront Distribution、WAFv2 (CLOUDFRONT)、Route 53 Alias、ACM 証明書連携      |
 
 ### Phase 5 イベント処理フロー
 
 1. 管理画面アップロード media は S3 バケットの `uploads/` プレフィックスに保存
-2. Spring Boot はアップロード完了 API で S3 オブジェクトを確認し、SQS メインキューへ `process-media-upload` を送信
-3. `mti.asahimyapp` / `BusinessEvent` は EventBridge カスタムバス経由で同キューへ集約
-4. `aws.mediaconvert` ステータスイベントを既定バスから同メインキューへ集約
-5. EventProcessor Lambda は `BusinessLambdaStack` に配置し、SQS 消費、VPC 接続、IAM 権限を Lambda ごとに定義
-6. リトライ超過メッセージは DLQ へ退避し、CloudWatch Alarm で検知
+2. Spring Boot はアップロード完了 API で S3 オブジェクトを確認し、Media SQS へ `process-media-upload` を送信
+3. `aws.mediaconvert` ステータスイベントは既定バスから Media SQS へ配送
+4. MediaEventProcessor Lambda は `MediaProcessingStack` に配置し、SQS 消費、VPC 接続、IAM 権限を定義
+5. リトライ超過メッセージは Media DLQ へ退避し、CloudWatch Alarm で検知
 
 ## 前提条件
 
@@ -127,9 +122,8 @@ npx cdk deploy MTI-dev-SecurityStack -c env=dev
 # 3. データ基盤をデプロイ
 npx cdk deploy MTI-dev-DataStack -c env=dev
 
-# 4. イベント処理基盤、業務 Lambda 配置用スタック、計算基盤をデプロイ
-npx cdk deploy MTI-dev-EventProcessingStack -c env=dev
-npx cdk deploy MTI-dev-BusinessLambdaStack -c env=dev
+# 4. Media 処理基盤、計算基盤をデプロイ
+npx cdk deploy MTI-dev-MediaProcessingStack -c env=dev
 npx cdk deploy MTI-dev-ComputeStack -c env=dev
 
 # 5. Edge 基盤（CloudFront/WAF）をデプロイ（CloudFront 経由の動作確認時）
@@ -181,8 +175,6 @@ npx tsc --noEmit
 | CloudFront Origin 検証ヘッダー値         | `originVerifyHeaderValue`            | Compute/Edge デプロイ時に CDK context で指定           |
 | 行動ログ Delivery 顧客 AWS アカウント ID | `actionLogDeliveryCustomerAccountId` | 顧客 AWS アカウント確定後に設定                        |
 | 行動ログ Delivery ExternalId             | `actionLogDeliveryExternalId`        | 顧客向け Cross-Account Role の ExternalId 確定後に設定 |
-| MediaConvert Endpoint                    | `mediaConvertEndpoint`               | MediaConvert エンドポイント確定後に設定                |
-| MediaConvert Role ARN                    | `mediaConvertRoleArn`                | MediaConvert 実行ロール作成後に設定                    |
 | Push Application ID                      | `pushApplicationId`                  | Push 配信基盤のアプリ ID 確定後に設定                  |
 | Push Credentials Secret ARN              | `pushCredentialsSecretArn`           | Secrets Manager シークレット作成後に設定               |
 

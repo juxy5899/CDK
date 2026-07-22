@@ -116,6 +116,10 @@ export class DataStack extends cdk.Stack {
       .node.findChild('Resource') as secretsmanager.CfnSecret;
     auroraSecretResource.applyRemovalPolicy(dataRemovalPolicy);
 
+    // ────────────────────────────────────────────────
+    // dev 用 DB トンネル
+    // 開発環境のみ SSM Port Forwarding 用 EC2 を作成し、Aurora をパブリック公開せず接続する
+    // ────────────────────────────────────────────────
     if (envName === 'dev') {
       const debugDbTunnelSg = new ec2.SecurityGroup(this, 'DebugDbTunnelSg', {
         vpc,
@@ -261,6 +265,10 @@ export class DataStack extends cdk.Stack {
       ],
     });
 
+    // ────────────────────────────────────────────────
+    // CloudFront / ALB アクセスログ保存用 S3 バケット
+    // enableAccessLogs=true の環境だけ作成し、ログ配信元が書き込める ownership 設定にする
+    // ────────────────────────────────────────────────
     if (envConfig.enableAccessLogs) {
       this.accessLogBucket = new s3.Bucket(this, 'AccessLogBucket', {
         bucketName: envConfig.accessLogBucketName,
@@ -340,6 +348,7 @@ export class DataStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     // AWS Backup（Aurora + メディアバケット）
     // 日次バックアップを一元管理し、誤操作時の復旧ポイントを確保する
+    // enableBackup=false の環境ではコストと検証速度を優先して作成しない
     // ────────────────────────────────────────────────
     if (envConfig.enableBackup) {
       const backupVault = new backup.BackupVault(this, 'DataBackupVault', {
@@ -365,6 +374,7 @@ export class DataStack extends cdk.Stack {
     // ────────────────────────────────────────────────
     // Athena / Glue（ログ分析用）
     // 結果出力用バケット、Workgroup、Raw 外部表を定義して SQL 分析基盤を標準化する
+    // パーティション射影を使い、日次パーティション追加ジョブなしでログを検索できるようにする
     // ────────────────────────────────────────────────
     if (envConfig.enableAthena) {
       const athenaResultsBucket = new s3.Bucket(this, 'AthenaResultsBucket', {

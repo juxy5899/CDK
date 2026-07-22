@@ -28,7 +28,6 @@ def handler(event, context):
                         "uploadKey": payload.get("uploadKey") or detail.get("uploadKey"),
                         "publicKey": payload.get("publicKey") or detail.get("publicKey"),
                         "dbSecretArn": os.environ.get("DB_SECRET_ARN"),
-                        "endpoint": os.environ.get("MEDIACONVERT_ENDPOINT"),
                         "roleArn": os.environ.get("MEDIACONVERT_ROLE_ARN"),
                         "eventId": payload.get("id") or "direct-sqs-message",
                     },

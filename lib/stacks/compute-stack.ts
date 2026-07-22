@@ -71,8 +71,8 @@ export class ComputeStack extends cdk.Stack {
     } = props;
 
     // ────────────────────────────────────────────────
-    // ALB セキュリティグループ
-    // CloudFront Origin-Facing プレフィックスリストからのアクセスのみ許可
+    // デプロイ入力検証 / ALB 公開制御
+    // stg/prod は CloudFront 経由公開を前提に、TLS・Origin 検証ヘッダー・固定イメージタグを必須化する
     // ────────────────────────────────────────────────
     const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
     const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
@@ -80,6 +80,7 @@ export class ComputeStack extends cdk.Stack {
     const hasMgtApiImageTag = !isPlaceholder(mgtApiImageTag);
     const allowDirectAlbAccess = envName === 'dev';
 
+    // strictValidation=true の場合は、placeholder のまま本番系へ誤デプロイしないよう synth 時点で停止する
     if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
       throw new Error(
         `${envName} requires certificateArn to enable HTTPS between CloudFront and ALB`,
@@ -98,6 +99,7 @@ export class ComputeStack extends cdk.Stack {
       );
     }
 
+    // strictValidation=false でも非 dev の未確定値は警告し、段階構築時の見落としを防ぐ
     if (
       envName !== 'dev' &&
       (!hasAlbCertificate || !hasOriginVerifyHeader || !hasAppApiImageTag || !hasMgtApiImageTag)
@@ -107,6 +109,10 @@ export class ComputeStack extends cdk.Stack {
       );
     }
 
+    // ────────────────────────────────────────────────
+    // ALB セキュリティグループ
+    // dev は検証用に直接アクセスを許可し、stg/prod は CloudFront Origin-Facing からの通信に限定する
+    // ────────────────────────────────────────────────
     const albSg = new ec2.SecurityGroup(this, 'AlbSg', {
       vpc,
       description: 'Security group for ALB',
@@ -174,6 +180,10 @@ export class ComputeStack extends cdk.Stack {
     });
     cdk.Tags.of(this.cluster).add('Name', buildResourceName(envName, 'cluster'));
 
+    // ────────────────────────────────────────────────
+    // API タスク定義共通ファクトリ
+    // API ごとに必要な DB / SQS / S3 権限だけを access フラグから付与する
+    // ────────────────────────────────────────────────
     const createTaskDefinition = (
       id: string,
       serviceName: string,
@@ -232,9 +242,11 @@ export class ComputeStack extends cdk.Stack {
       });
       container.addPortMappings({ containerPort });
       if (access.eventQueueSend) {
+        // 業務イベントを投入する API にのみ SQS SendMessage を許可する
         eventQueue.grantSendMessages(taskDefinition.taskRole);
       }
       if (access.mediaBucket) {
+        // メディア API 用のオブジェクト読み書き権限。バケット管理権限は付与しない
         taskDefinition.addToTaskRolePolicy(
           new iam.PolicyStatement({
             sid: 'MediaBucketObjectAccess',
@@ -245,6 +257,7 @@ export class ComputeStack extends cdk.Stack {
         );
       }
       if (access.actionLogRawBucket) {
+        // 行動ログ Raw は指定 prefix への PutObject のみに絞る
         taskDefinition.addToTaskRolePolicy(
           new iam.PolicyStatement({
             sid: 'ActionLogRawBucketWriteAccess',
@@ -256,6 +269,7 @@ export class ComputeStack extends cdk.Stack {
       }
 
       if (envConfig.enableXray) {
+        // X-Ray は任意機能。サイドカーと送信権限を同時に追加して trace 送信経路を完結させる
         container.addEnvironment('AWS_XRAY_DAEMON_ADDRESS', '127.0.0.1:2000');
         const xrayLogGroup = new logs.LogGroup(this, `${id}XrayDaemonLogGroup`, {
           logGroupName: `/aws/ecs/${buildResourceName(envName, `${serviceName}-xray-daemon`)}`,
@@ -388,6 +402,10 @@ export class ComputeStack extends cdk.Stack {
     // });
     // cdk.Tags.of(this.appApiService).add('Name', buildResourceName(envName, 'app-api-service'));
 
+    // ────────────────────────────────────────────────
+    // ALB ルーティング条件
+    // stg/prod は CloudFront が付与する検証ヘッダーを要求し、ALB 直叩きを遮断する
+    // ────────────────────────────────────────────────
     const apiListenerConditions = (pathPattern: string): elbv2.ListenerCondition[] => {
       const conditions = [elbv2.ListenerCondition.pathPatterns([pathPattern])];
       if (!allowDirectAlbAccess) {

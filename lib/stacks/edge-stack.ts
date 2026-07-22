@@ -110,6 +110,10 @@ export class EdgeStack extends cdk.Stack {
     const hasAlbCertificate = !isPlaceholder(envConfig.certificateArn);
     const hasOriginVerifyHeader = !isPlaceholder(envConfig.cloudFrontOriginVerifyHeaderValue);
 
+    // ────────────────────────────────────────────────
+    // Edge デプロイ入力検証
+    // stg/prod は CloudFront から ALB まで HTTPS と Origin 検証ヘッダーを前提にする
+    // ────────────────────────────────────────────────
     if (strictValidation && envName !== 'dev' && !hasAlbCertificate) {
       throw new Error(
         `${envName} requires certificateArn to enforce HTTPS_ONLY from CloudFront to ALB`,
@@ -122,12 +126,17 @@ export class EdgeStack extends cdk.Stack {
       );
     }
 
+    // strictValidation=false の段階構築でも、本番系の未確定入力は CloudFormation warning として残す
     if (envName !== 'dev' && (!hasAlbCertificate || !hasOriginVerifyHeader)) {
       cdk.Annotations.of(this).addWarning(
         'EdgeStack has placeholder ALB origin inputs. Use -c strictComputeValidation=true with certificateArn and originVerifyHeaderValue before deploying Edge.',
       );
     }
 
+    // ────────────────────────────────────────────────
+    // ALB Origin
+    // 証明書が未確定の dev は HTTP origin を許容し、本番系は HTTPS_ONLY へ切り替える
+    // ────────────────────────────────────────────────
     const albOrigin = new origins.HttpOrigin(albOriginDomainName, {
       protocolPolicy: hasAlbCertificate
         ? cloudfront.OriginProtocolPolicy.HTTPS_ONLY
@@ -150,6 +159,7 @@ export class EdgeStack extends cdk.Stack {
       'mgt-api/*': apiBehavior,
     };
 
+    // アクセスログは DataStack 側で作成された既存バケットを参照し、EdgeStack 側では所有しない
     const accessLogBucket = envConfig.enableAccessLogs
       ? s3.Bucket.fromBucketAttributes(this, 'AccessLogBucket', {
           bucketName: envConfig.accessLogBucketName,
@@ -157,6 +167,10 @@ export class EdgeStack extends cdk.Stack {
         })
       : undefined;
 
+    // ────────────────────────────────────────────────
+    // 管理画面 SPA リライト
+    // 拡張子のないパスを index.html に寄せ、CloudFront 配下でクライアントルーティングを成立させる
+    // ────────────────────────────────────────────────
     const adminSiteSpaRewriteFunction = new cloudfront.Function(
       this,
       'AdminSiteSpaRewriteFunction',
@@ -199,6 +213,7 @@ export class EdgeStack extends cdk.Stack {
         : {}),
     };
 
+    // カスタムドメインと us-east-1 ACM 証明書がそろった環境だけ alias domain を有効化する
     const distributionProps: cloudfront.DistributionProps =
       hasCustomDomain && hasEdgeCertificate
         ? {

@@ -5,8 +5,7 @@ import { NetworkStack } from '../lib/stacks/network-stack';
 import { DataStack } from '../lib/stacks/data-stack';
 import { ComputeStack } from '../lib/stacks/compute-stack';
 import { SecurityStack } from '../lib/stacks/security-stack';
-import { EventProcessingStack } from '../lib/stacks/event-processing-stack';
-import { BusinessLambdaStack } from '../lib/stacks/business-lambda-stack';
+import { MediaProcessingStack } from '../lib/stacks/media-processing-stack';
 import { EdgeStack } from '../lib/stacks/edge-stack';
 import { environments } from '../lib/config/environments';
 
@@ -80,19 +79,8 @@ const dataStack = new DataStack(app, `MTI-${envName}-DataStack`, {
 dataStack.addDependency(networkStack);
 dataStack.addDependency(securityStack);
 
-// イベント処理スタック（NetworkStack + DataStack に依存）
-const eventProcessingStack = new EventProcessingStack(app, `MTI-${envName}-EventProcessingStack`, {
-  env,
-  envName,
-  envConfig,
-  description: `[${envName}] MTI Asahimyapp System - Event Processing Foundation Stack`,
-  terminationProtection: envName === 'prod',
-});
-eventProcessingStack.addDependency(networkStack);
-eventProcessingStack.addDependency(dataStack);
-
-// ビジネス Lambda スタック（業務処理 Lambda は要件確定後に追加する）
-const businessLambdaStack = new BusinessLambdaStack(app, `MTI-${envName}-BusinessLambdaStack`, {
+// Media 処理スタック（NetworkStack + DataStack に依存）
+const mediaProcessingStack = new MediaProcessingStack(app, `MTI-${envName}-MediaProcessingStack`, {
   env,
   envName,
   envConfig,
@@ -100,16 +88,13 @@ const businessLambdaStack = new BusinessLambdaStack(app, `MTI-${envName}-Busines
   mediaBucket: dataStack.mediaBucket,
   auroraSecret: dataStack.auroraSecret,
   auroraSecurityGroup: dataStack.auroraSecurityGroup,
-  eventBus: eventProcessingStack.eventBus,
-  eventQueue: eventProcessingStack.eventQueue,
-  description: `[${envName}] MTI Asahimyapp System - Business Lambda Stack`,
+  description: `[${envName}] MTI Asahimyapp System - Media Processing Stack`,
   terminationProtection: envName === 'prod',
 });
-businessLambdaStack.addDependency(networkStack);
-businessLambdaStack.addDependency(dataStack);
-businessLambdaStack.addDependency(eventProcessingStack);
+mediaProcessingStack.addDependency(networkStack);
+mediaProcessingStack.addDependency(dataStack);
 
-// コンピュートスタック（NetworkStack + DataStack + EventProcessingStack に依存）
+// コンピュートスタック（NetworkStack + DataStack + MediaProcessingStack に依存）
 const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   env,
   envName,
@@ -125,13 +110,13 @@ const computeStack = new ComputeStack(app, `MTI-${envName}-ComputeStack`, {
   strictValidation: strictComputeValidation,
   auroraSecret: dataStack.auroraSecret,
   auroraSecurityGroup: dataStack.auroraSecurityGroup,
-  eventQueue: eventProcessingStack.eventQueue,
+  eventQueue: mediaProcessingStack.mediaQueue,
   description: `[${envName}] MTI Asahimyapp System - Compute Foundation Stack`,
   terminationProtection: envName === 'prod',
 });
 computeStack.addDependency(networkStack);
 computeStack.addDependency(dataStack);
-computeStack.addDependency(eventProcessingStack);
+computeStack.addDependency(mediaProcessingStack);
 
 // エッジスタック（CloudFront/WAF/ACM）
 // CloudFront スコープの WAF と証明書を扱うため us-east-1 に固定する

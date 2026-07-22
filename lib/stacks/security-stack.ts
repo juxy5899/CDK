@@ -36,6 +36,7 @@ export class SecurityStack extends cdk.Stack {
         );
       }
 
+      // placeholder の場合は既定の顧客アカウントを使い、環境設定確定後は明示 ID に置き換える
       const customerAccountPrincipal = isPlaceholder(customerAccountId)
         ? new iam.AccountPrincipal('825269749877') // 部署先 AWS アカウント ID
         : new iam.AccountPrincipal(customerAccountId);
@@ -51,6 +52,7 @@ export class SecurityStack extends cdk.Stack {
           'Cross-account IAM role for retrieving action log delivery TSV files from the customer AWS account',
       });
 
+      // バケット一覧権限は Delivery TSV の prefix のみに限定し、他 prefix の存在を見せない
       this.actionLogDeliveryAccessRole.addToPolicy(
         new iam.PolicyStatement({
           sid: 'ListActionLogDeliveryBucket',
@@ -70,6 +72,7 @@ export class SecurityStack extends cdk.Stack {
         }),
       );
 
+      // オブジェクト取得も events / attributes の TSV 出力 prefix に限定する
       this.actionLogDeliveryAccessRole.addToPolicy(
         new iam.PolicyStatement({
           sid: 'GetActionLogDeliveryObjects',

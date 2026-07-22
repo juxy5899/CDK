@@ -30,7 +30,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: false,
     enableInspector: false, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: false, // EventBridge ルール有効化フラグ
+    enableMediaProcessing: true, // media upload 後続処理有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-dev', // メディアアセット格納用 S3 バケット名
     mediaUploadAllowedOrigins: [
       'https://d18m41fslxip8d.cloudfront.net',
@@ -78,9 +78,6 @@ export const environments: Record<string, EnvConfig> = {
     enableCloudTrail: false, // CloudTrail 有効化フラグ
     enableGuardDuty: false, // GuardDuty 有効化フラグ
     enableSecurityHub: false, // Security Hub 有効化フラグ
-    eventBusName: '', // EventBridge カスタムバス名（空なら自動命名）
-    mediaConvertEndpoint: 'PLACEHOLDER_MEDIACONVERT_ENDPOINT', // MediaConvert エンドポイント
-    mediaConvertRoleArn: 'PLACEHOLDER_MEDIACONVERT_ROLE_ARN', // MediaConvert 実行ロール ARN
     pushApplicationId: 'PLACEHOLDER_PUSH_APPLICATION_ID', // Push 配信アプリケーション ID
     pushCredentialsSecretArn: 'PLACEHOLDER_PUSH_CREDENTIALS_SECRET_ARN', // Push 資格情報の Secrets Manager ARN
     eventProcessorTimeoutSec: 30, // EventProcessor Lambda タイムアウト（秒）
@@ -116,7 +113,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: false, // EventBridge ルール有効化フラグ
+    enableMediaProcessing: false, // media upload 後続処理有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-stg', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-stg', // Athena クエリ結果出力用 S3 バケット名
     accessLogBucketName: 'asahimyapp-access-logs-stg', // CloudFront / ALB アクセスログ保存用 S3 バケット名
@@ -161,9 +158,6 @@ export const environments: Record<string, EnvConfig> = {
     enableCloudTrail: true, // CloudTrail 有効化フラグ
     enableGuardDuty: true, // GuardDuty 有効化フラグ
     enableSecurityHub: false, // Security Hub 有効化フラグ（stg はコスト最適化で無効）
-    eventBusName: '', // EventBridge カスタムバス名（空なら自動命名）
-    mediaConvertEndpoint: 'PLACEHOLDER_MEDIACONVERT_ENDPOINT', // MediaConvert エンドポイント
-    mediaConvertRoleArn: 'PLACEHOLDER_MEDIACONVERT_ROLE_ARN', // MediaConvert 実行ロール ARN
     pushApplicationId: 'PLACEHOLDER_PUSH_APPLICATION_ID', // Push 配信アプリケーション ID
     pushCredentialsSecretArn: 'PLACEHOLDER_PUSH_CREDENTIALS_SECRET_ARN', // Push 資格情報の Secrets Manager ARN
     eventProcessorTimeoutSec: 60, // EventProcessor Lambda タイムアウト（秒）
@@ -199,7 +193,7 @@ export const environments: Record<string, EnvConfig> = {
     retainDataResources: true, // データ保護のため S3 / Aurora は Stack 削除後も保持する
     enableInspector: true, // Inspector（脆弱性スキャン）有効化フラグ
     enableXray: true, // X-Ray（分散トレーシング）有効化フラグ
-    enableEventProcessing: false, // EventBridge ルール有効化フラグ
+    enableMediaProcessing: false, // media upload 後続処理有効化フラグ
     mediaBucketName: 'asahimyapp-media-assets-prod', // メディアアセット格納用 S3 バケット名
     athenaResultsBucketName: 'asahimyapp-athena-results-prod', // Athena クエリ結果出力用 S3 バケット名
     accessLogBucketName: 'asahimyapp-access-logs-prod', // CloudFront / ALB アクセスログ保存用 S3 バケット名
@@ -244,9 +238,6 @@ export const environments: Record<string, EnvConfig> = {
     enableCloudTrail: true, // CloudTrail 有効化フラグ
     enableGuardDuty: true, // GuardDuty 有効化フラグ
     enableSecurityHub: true, // Security Hub 有効化フラグ
-    eventBusName: '', // EventBridge カスタムバス名（空なら自動命名）
-    mediaConvertEndpoint: 'PLACEHOLDER_MEDIACONVERT_ENDPOINT', // MediaConvert エンドポイント
-    mediaConvertRoleArn: 'PLACEHOLDER_MEDIACONVERT_ROLE_ARN', // MediaConvert 実行ロール ARN
     pushApplicationId: 'PLACEHOLDER_PUSH_APPLICATION_ID', // Push 配信アプリケーション ID
     pushCredentialsSecretArn: 'PLACEHOLDER_PUSH_CREDENTIALS_SECRET_ARN', // Push 資格情報の Secrets Manager ARN
     eventProcessorTimeoutSec: 60, // EventProcessor Lambda タイムアウト（秒）

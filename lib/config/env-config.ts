@@ -147,23 +147,14 @@ export interface EnvConfig {
   /** AWS X-Ray 有効化 */
   enableXray: boolean;
 
-  /** イベント処理基盤の有効化 */
-  enableEventProcessing: boolean;
-
-  /** EventBridge カスタムバス名（空の場合は自動生成） */
-  eventBusName?: string;
+  /** media upload 後続処理の有効化 */
+  enableMediaProcessing: boolean;
 
   /** 管理画面アップロード動画の入力プレフィックス */
   videoUploadPrefix: string;
 
   /** CloudFront 配信用公開アセットプレフィックス */
   mediaOutputPrefix: string;
-
-  /** MediaConvert エンドポイント（未確定時はプレースホルダー） */
-  mediaConvertEndpoint: string;
-
-  /** MediaConvert 実行ロール ARN（未確定時はプレースホルダー） */
-  mediaConvertRoleArn: string;
 
   /** Push 配信アプリケーション ID（未確定時はプレースホルダー） */
   pushApplicationId: string;
