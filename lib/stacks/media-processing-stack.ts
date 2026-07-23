@@ -161,6 +161,7 @@ export class MediaProcessingStack extends cdk.Stack {
         APP_ENV: envName,
         ENABLE_MEDIA_PROCESSING: String(envConfig.enableMediaProcessing),
         EVENT_QUEUE_NAME: this.mediaQueue.queueName,
+        EVENT_DLQ_MAX_RECEIVE_COUNT: String(envConfig.eventDlqMaxReceiveCount),
         DB_SECRET_ARN: auroraSecret.secretArn,
         VIDEO_BUCKET_NAME: mediaBucket.bucketName,
         VIDEO_UPLOAD_PREFIX: envConfig.videoUploadPrefix,
@@ -181,7 +182,8 @@ export class MediaProcessingStack extends cdk.Stack {
     // media 処理に必要な Aurora Secret / S3 / SQS / MediaConvert のみに権限を付与する
     // ────────────────────────────────────────────────
     auroraSecret.grantRead(this.mediaEventProcessor);
-    mediaBucket.grantReadWrite(this.mediaEventProcessor);
+    mediaBucket.grantRead(this.mediaEventProcessor, `${envConfig.videoUploadPrefix}*`);
+    mediaBucket.grantWrite(this.mediaEventProcessor, `${envConfig.mediaOutputPrefix}*`);
 
     this.mediaEventProcessor.addToRolePolicy(
       new iam.PolicyStatement({
@@ -208,15 +210,26 @@ export class MediaProcessingStack extends cdk.Stack {
 
     this.mediaEventProcessor.addToRolePolicy(
       new iam.PolicyStatement({
+        sid: 'MediaConvertDescribeEndpoints',
+        effect: iam.Effect.ALLOW,
+        actions: ['mediaconvert:DescribeEndpoints'],
+        resources: ['*'],
+      }),
+    );
+
+    this.mediaEventProcessor.addToRolePolicy(
+      new iam.PolicyStatement({
         sid: 'MediaConvertCreateJob',
         effect: iam.Effect.ALLOW,
-        actions: ['mediaconvert:CreateJob', 'mediaconvert:DescribeEndpoints'],
-        resources: ['*'],
-        conditions: {
-          StringEquals: {
-            'mediaconvert:Role': mediaConvertJobRole.roleArn,
-          },
-        },
+        actions: ['mediaconvert:CreateJob'],
+        resources: [
+          cdk.Stack.of(this).formatArn({
+            service: 'mediaconvert',
+            resource: 'queues',
+            resourceName: 'Default',
+            arnFormat: cdk.ArnFormat.SLASH_RESOURCE_NAME,
+          }),
+        ],
       }),
     );
 

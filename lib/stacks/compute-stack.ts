@@ -246,13 +246,21 @@ export class ComputeStack extends cdk.Stack {
         eventQueue.grantSendMessages(taskDefinition.taskRole);
       }
       if (access.mediaBucket) {
-        // メディア API 用のオブジェクト読み書き権限。バケット管理権限は付与しない
+        // メディア API は署名URL発行とアップロード完了確認のみを担当し、書き込み先を upload prefix に限定する
         taskDefinition.addToTaskRolePolicy(
           new iam.PolicyStatement({
-            sid: 'MediaBucketObjectAccess',
+            sid: 'MediaBucketReadAccess',
             effect: iam.Effect.ALLOW,
-            actions: ['s3:GetObject', 's3:PutObject'],
+            actions: ['s3:GetObject'],
             resources: [mediaBucket.arnForObjects('*')],
+          }),
+        );
+        taskDefinition.addToTaskRolePolicy(
+          new iam.PolicyStatement({
+            sid: 'MediaBucketUploadWriteAccess',
+            effect: iam.Effect.ALLOW,
+            actions: ['s3:PutObject'],
+            resources: [mediaBucket.arnForObjects(`${envConfig.videoUploadPrefix}*`)],
           }),
         );
       }
