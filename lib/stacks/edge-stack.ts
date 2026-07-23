@@ -34,6 +34,11 @@ export class EdgeStack extends cdk.Stack {
     super(scope, id, props);
 
     const { envName, envConfig, albOriginDomainName, strictValidation } = props;
+    // Media bucket policy は DataStack で明示管理するため、imported bucket への自動 policy 更新警告のみ抑止する。
+    cdk.Annotations.of(this).acknowledgeWarning(
+      '@aws-cdk/aws-cloudfront-origins:updateImportedBucketPolicyOac',
+      'Media bucket policy is managed explicitly in DataStack for the public media prefix.',
+    );
 
     // ────────────────────────────────────────────────
     // 管理画面静的ホスティング用 S3
@@ -154,7 +159,35 @@ export class EdgeStack extends cdk.Stack {
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER,
     };
 
+    const mediaOriginBucket = s3.Bucket.fromBucketAttributes(this, 'MediaOriginBucket', {
+      bucketName: envConfig.mediaBucketName,
+      bucketRegionalDomainName: `${envConfig.mediaBucketName}.s3.${envConfig.region}.amazonaws.com`,
+    });
+    const mediaOutputPathPattern = `${envConfig.mediaOutputPrefix.replace(/^\/+/, '')}*`;
+    const mediaBehavior: cloudfront.BehaviorOptions = {
+      origin: origins.S3BucketOrigin.withOriginAccessControl(mediaOriginBucket),
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      responseHeadersPolicy: new cloudfront.ResponseHeadersPolicy(
+        this,
+        'MediaCorsResponseHeadersPolicy',
+        {
+          responseHeadersPolicyName: buildResourceName(envName, 'media-cors-response-headers'),
+          corsBehavior: {
+            accessControlAllowCredentials: false,
+            accessControlAllowHeaders: ['*'],
+            accessControlAllowMethods: ['GET', 'HEAD', 'OPTIONS'],
+            accessControlAllowOrigins: ['*'],
+            accessControlMaxAge: cdk.Duration.seconds(3600),
+            originOverride: true,
+          },
+        },
+      ),
+    };
+
     const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {
+      [mediaOutputPathPattern]: mediaBehavior,
       'app-api/*': apiBehavior,
       'mgt-api/*': apiBehavior,
     };

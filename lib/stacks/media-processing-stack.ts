@@ -210,15 +210,6 @@ export class MediaProcessingStack extends cdk.Stack {
 
     this.mediaEventProcessor.addToRolePolicy(
       new iam.PolicyStatement({
-        sid: 'MediaConvertDescribeEndpoints',
-        effect: iam.Effect.ALLOW,
-        actions: ['mediaconvert:DescribeEndpoints'],
-        resources: ['*'],
-      }),
-    );
-
-    this.mediaEventProcessor.addToRolePolicy(
-      new iam.PolicyStatement({
         sid: 'MediaConvertCreateJob',
         effect: iam.Effect.ALLOW,
         actions: ['mediaconvert:CreateJob'],

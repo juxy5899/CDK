@@ -218,6 +218,23 @@ export class DataStack extends cdk.Stack {
         },
       ],
     });
+    this.mediaBucket.addToResourcePolicy(
+      new iam.PolicyStatement({
+        sid: 'AllowCloudFrontReadPublicMedia',
+        effect: iam.Effect.ALLOW,
+        principals: [new iam.ServicePrincipal('cloudfront.amazonaws.com')],
+        actions: ['s3:GetObject'],
+        resources: [this.mediaBucket.arnForObjects(`${envConfig.mediaOutputPrefix}*`)],
+        conditions: {
+          StringEquals: {
+            'AWS:SourceAccount': envConfig.account,
+          },
+          StringLike: {
+            'AWS:SourceArn': `arn:aws:cloudfront::${envConfig.account}:distribution/*`,
+          },
+        },
+      }),
+    );
 
     // ────────────────────────────────────────────────
     // 行動ログ Raw データ保存用 S3 バケット
